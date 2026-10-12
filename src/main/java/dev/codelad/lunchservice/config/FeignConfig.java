@@ -6,7 +6,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import feign.RequestInterceptor;
-import feign.RequestTemplate;
 
 /**
  * Конфигурация Feign-клиентов для LunchService.
@@ -33,8 +32,8 @@ public class FeignConfig {
     public RequestInterceptor internalServiceKeyInterceptor() {
         return template -> {
             // Добавляем API Key для всех запросов к Notification Service
-            template.url();
-            if (template.url().contains("/api/notifications/")) {
+            // Notification Service endpoints: /api/public/*
+            if (template.url().contains("/api/public/")) {
                 template.header("X-Internal-Service-Key", internalServiceKey);
                 log.debug("[FEIGN] Added X-Internal-Service-Key header to: {}", template.url());
             }

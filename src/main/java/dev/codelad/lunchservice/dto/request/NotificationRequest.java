@@ -8,8 +8,10 @@ import lombok.NoArgsConstructor;
 import java.util.Map;
 
 /**
- * Запрос на создание уведомления через Notification Service.
- * Содержит информацию о пользователе, типе уведомления, тексте и дополнительных данных.
+ * Внутренний запрос на создание уведомления.
+ * Используется NotificationEventPublisher и NotificationEvent.
+ * 
+ * Для отправки в Notification Service преобразуется в SendNotificationRequest.
  */
 @Data
 @Builder
@@ -18,28 +20,22 @@ import java.util.Map;
 public class NotificationRequest {
 
     /**
-     * UUID пользователя (из JWT токена, externalId)
+     * UUID пользователя (из JWT токена, externalId).
      */
     private String userId;
 
     /**
-     * Тип уведомления (например: "BOOKING_CREATED", "BOOKING_CANCELLED", "BOOKING_APPROVED")
-     */
-    private String notificationType;
-
-    /**
-     * Заголовок уведомления (отображается в push-уведомлении)
+     * Заголовок уведомления.
      */
     private String title;
 
     /**
-     * Текст уведомления (отображается в push-уведомлении)
+     * Текст уведомления.
      */
     private String message;
 
     /**
-     * Дополнительные данные для уведомления (опционально)
-     * Например: бронь ID, время, название ресторана
+     * Дополнительные данные для шаблона.
      */
     private Map<String, String> data;
 }

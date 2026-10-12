@@ -45,6 +45,9 @@ public final class ApiTags {
     /** Аутентификация — получение JWT-токенов (только Dev/Local) */
     public static final String AUTH = "\uD83D\uDD10 Аутентификация тестовая";
 
+    /** Настройки заведения — управление параметрами заведения (no-show grace period и др.) */
+    public static final String VENUE_SETTINGS = "\u2699\uFE0F Настройки заведения";
+
     // ==================== РОЛЕВЫЕ ТЕГИ ====================
 
     /** Глобальный администратор (GL) — полный доступ ко всем ресурсам */
@@ -88,6 +91,9 @@ public final class ApiTags {
     /** Тестовая аутентификация для Dev/Local профилей. Эмулирует Auth Service и Bar Auth Service. Не используется в Production */
     @SuppressWarnings("squid:S2068")
     public static final String AUTH_DESC = "Тестовая аутентификация для Dev/Local профилей. Эмулирует Auth Service и Bar Auth Service. Не используется в Production";
+
+    /** API для управления настройками заведения (no-show grace period и др.) */
+    public static final String VENUE_SETTINGS_DESC = "API для управления настройками заведения (период ожидания no-show и другие параметры)";
 
     /** Все методы для глобального администратора (полный доступ ко всем ресурсам системы) */
     public static final String GLOBAL_ADMIN_DESC = "Все методы для глобального администратора (полный доступ ко всем ресурсам системы)";

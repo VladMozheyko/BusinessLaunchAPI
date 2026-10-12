@@ -1,5 +1,6 @@
 package dev.codelad.lunchservice.dto.request;
 
+import dev.codelad.lunchservice.enums.Platform;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -23,22 +24,22 @@ public class DeviceRegistrationRequest {
     private UUID userId;
 
     /**
-     * ID существующего устройства для обновления (опционально)
+     * ID существующего устройства для обновления (опционально).
      */
     private Long deviceId;
 
     /**
-     * Платформа устройства: ANDROID, IOS, WEB
+     * Платформа устройства: ANDROID, IOS, WEB.
      */
-    private String platform;
+    private Platform platform;
 
     /**
-     * FCM/APNs/Web Push токен
+     * FCM/APNs/Web Push токен.
      */
     private String fcmToken;
 
     /**
-     * Часовой пояс пользователя (опционально)
+     * Часовой пояс пользователя (опционально).
      */
     private String timezone;
 }

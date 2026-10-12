@@ -1,7 +1,7 @@
 package dev.codelad.lunchservice.repository;
 
 import dev.codelad.lunchservice.dto.request.DeviceRegistrationRequest;
-import dev.codelad.lunchservice.dto.request.NotificationRequest;
+import dev.codelad.lunchservice.dto.request.SendNotificationRequest;
 import dev.codelad.lunchservice.dto.response.NotificationResponse;
 import dev.codelad.lunchservice.dto.request.PreferencesRequest;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -18,32 +18,31 @@ import java.util.Map;
  * 
  * Как работает:
  * - name = "notification-service" — имя сервиса в Kubernetes DNS / Service Discovery
- * - path = "/api/notifications" — базовый путь к контроллерам
+ * - path = "/api/public" — базовый путь к публичным endpoint-ам Notification Service
  * - url — переопределяет имя сервиса для локальной разработки
  * 
- * lunch-service → notification-service:8082/api/notifications/public/send
+ * lunch-service -> notification-service:8082/api/public/send
  * 
- * Endpoint /api/public/send — публичный, не требует JWT авторизации.
- * LunchService вызывает его напрямую для отправки push-уведомлений.
+ * Endpoint /api/public/send — требует заголовок X-Internal-Service-Key (добавляется FeignConfig).
  */
 @FeignClient(
         name = "notification-service",
-        path = "/api/notifications",
+        path = "/api/public",
         url = "${notification.service.url:http://localhost:8082}"
 )
 public interface NotificationFeignClient {
 
     /**
-     * Создаёт уведомление для пользователя (публичный endpoint).
+     * Отправить push-уведомление.
      * 
      * Notification Service сам найдёт устройства пользователя и отправит push.
      * 
      * @param request — тело запроса с данными уведомления
      * @return ответ от Notification Service
      */
-    @PostMapping("/public/send")
-    ResponseEntity<NotificationResponse> createNotification(
-            @RequestBody NotificationRequest request
+    @PostMapping("/send")
+    ResponseEntity<NotificationResponse> sendNotification(
+            @RequestBody SendNotificationRequest request
     );
 
     /**
@@ -52,7 +51,7 @@ public interface NotificationFeignClient {
      * @param request — данные устройства (platform, fcmToken, timezone)
      * @return результат регистрации
      */
-    @PostMapping("/public/register-device")
+    @PostMapping("/devices")
     ResponseEntity<Map<String, Object>> registerDevice(
             @RequestBody DeviceRegistrationRequest request
     );
@@ -63,7 +62,7 @@ public interface NotificationFeignClient {
      * @param request — настройки (pushEnabled, marketing)
      * @return результат обновления
      */
-    @PostMapping("/public/preferences")
+    @PostMapping("/notifications")
     ResponseEntity<Map<String, Object>> updatePreferences(
             @RequestBody PreferencesRequest request
     );
@@ -74,7 +73,7 @@ public interface NotificationFeignClient {
      * @param id — ID уведомления
      * @return статус и метрики уведомления
      */
-    @GetMapping("/public/notifications/{id}/status")
+    @GetMapping("/notifications/{id}/status")
     ResponseEntity<NotificationResponse> getNotificationStatus(
             @PathVariable("id") Long id
     );

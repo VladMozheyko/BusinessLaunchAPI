@@ -37,25 +37,39 @@ public class SecurityProperties {
 
     private String prefix = "Bearer ";
 
+    public String getSecretKey() {
+        return secretKey;
+    }
+
     public void setSecretKey(String secretKey) {
         this.secretKey = secretKey;
-        log.debug("[SecurityProperties] Секретный ключ JWT настроен (длина: {})",
+        log.debug("[SecurityProperties] Secret key configured (length: {})",
                 secretKey != null ? secretKey.length() : 0);
+    }
+
+    public String getBarAuthSecretKey() {
+        return barAuthSecretKey;
     }
 
     public void setBarAuthSecretKey(String barAuthSecretKey) {
         this.barAuthSecretKey = barAuthSecretKey;
-        log.debug("[SecurityProperties] Секретный ключ Bar Auth JWT настроен (длина: {})",
+        log.debug("[SecurityProperties] Bar Auth secret key configured (length: {})",
                 barAuthSecretKey != null ? barAuthSecretKey.length() : 0);
+    }
+
+    public String getHeader() {
+        return header;
     }
 
     public void setHeader(String header) {
         this.header = header;
-        log.debug("[SecurityProperties] Заголовок JWT установлен: {}", header);
+    }
+
+    public String getPrefix() {
+        return prefix;
     }
 
     public void setPrefix(String prefix) {
         this.prefix = prefix;
-        log.debug("[SecurityProperties] Префикс JWT установлен: {}", prefix);
     }
 }

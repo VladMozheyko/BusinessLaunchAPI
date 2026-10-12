@@ -1,6 +1,6 @@
 package dev.codelad.lunchservice.listener;
 
-import dev.codelad.lunchservice.dto.request.NotificationRequest;
+import dev.codelad.lunchservice.dto.request.SendNotificationRequest;
 import dev.codelad.lunchservice.dto.response.NotificationResponse;
 import dev.codelad.lunchservice.repository.NotificationFeignClient;
 import lombok.RequiredArgsConstructor;
@@ -10,9 +10,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.ResponseEntity;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * Слушатель событий уведомлений.
  * 
@@ -20,7 +17,7 @@ import java.util.Map;
  * 1. NotificationEventPublisher публикует NotificationEvent
  * 2. Этот слушатель получает событие через @EventListener
  * 3. Метод handleNotificationEvent помечен @Async — выполняется в отдельном потоке
- * 4. Слушатель преобразует NotificationEvent в NotificationRequest
+ * 4. Слушатель преобразует NotificationEvent в SendNotificationRequest
  * 5. Отправляет запрос через NotificationFeignClient к Notification Service
  * 
  * Почему @Async?
@@ -48,23 +45,28 @@ public class NotificationEventListener {
 
         try {
             // 1. Создаём запрос для Notification Service
-            NotificationRequest request = buildNotificationRequest(event);
+            SendNotificationRequest request = SendNotificationRequest.fromEvent(
+                    event.getUserId(),
+                    event.getTitle(),
+                    event.getMessage(),
+                    event.getTemplateData()
+            );
 
-            // 2. Отправляем через Feign-клиент (публичный endpoint, без JWT)
-            ResponseEntity<NotificationResponse> response =
-                    notificationFeignClient.createNotification(request);
+            // 2. Отправляем через Feign-клиент (требует X-Internal-Service-Key header)
+            ResponseEntity<NotificationResponse> response = notificationFeignClient.sendNotification(request);
 
             // 3. Обрабатываем ответ
-            if (response.getBody() != null && response.getBody().isSuccess()) {
-                log.info("[NOTIFICATION_SENT] Success: type={}, userId={}, notificationId={}",
+            if (response.getBody() != null) {
+                NotificationResponse body = response.getBody();
+                log.info("[NOTIFICATION_SENT] Success: type={}, userId={}, notificationId={}, status={}",
                         event.getEventType(),
                         event.getUserId(),
-                        response.getBody().getNotificationId());
+                        body.getId(),
+                        body.getStatus());
             } else {
-                log.error("[NOTIFICATION_FAILED] Failed: type={}, userId={}, response={}",
+                log.error("[NOTIFICATION_FAILED] Failed: type={}, userId={}, response body is null",
                         event.getEventType(),
-                        event.getUserId(),
-                        response.getBody());
+                        event.getUserId());
             }
 
         } catch (Exception e) {
@@ -76,25 +78,5 @@ public class NotificationEventListener {
                     e.getMessage(),
                     e);
         }
-    }
-
-    /**
-     * Создаёт NotificationRequest из NotificationEvent.
-     * Преобразуем данные события в формат, понятный Notification Service.
-     */
-    private NotificationRequest buildNotificationRequest(NotificationEvent event) {
-        // Преобразуем templateData в Map<String, String> для Notification Service
-        Map<String, String> dataMap = new HashMap<>();
-        if (event.getTemplateData() != null) {
-            dataMap.putAll(event.getTemplateData());
-        }
-
-        return NotificationRequest.builder()
-                .userId(event.getUserId())
-                .notificationType(event.getEventType().name())
-                .title(event.getTitle())
-                .message(event.getMessage())
-                .data(dataMap)
-                .build();
     }
 }
