@@ -212,7 +212,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         boolean globalAdminExists = userRepository.existsByRole(Role.ROLE_GLOBAL_ADMIN);
 
         if (email != null
-                && email.equalsIgnoreCase(globalAdminProperties.getDefaultEmail())
+                && email.equalsIgnoreCase(globalAdminProperties.getBootstrapEmail())
                 && !globalAdminExists) {
             // Это первый вход глобального админа
             log.info("[BOOTSTRAP] Создаём GLOBAL_ADMIN: email={}", email);

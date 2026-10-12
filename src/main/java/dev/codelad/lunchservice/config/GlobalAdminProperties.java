@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
  */
 @Data
 @Configuration
-@ConfigurationProperties(prefix = "app.admin.bootstrap-email")
+@ConfigurationProperties(prefix = "app.admin")
 public class GlobalAdminProperties {
 
     /**
@@ -18,5 +18,5 @@ public class GlobalAdminProperties {
      * Используется только при первом входе пользователя (если не найден в БД по externalId).
      * Работает один раз за всю жизнь системы — после создания первого GLOBAL_ADMIN
      */
-    private String defaultEmail;
+    private String bootstrapEmail;
 }

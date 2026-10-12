@@ -80,7 +80,8 @@ public final class DotenvLoader {
      * Загрузить переменные из файла для заданного профиля.
      */
     private static void loadFile() {
-        Map<String, String> vars = readEnvFile();
+        String profile = getActiveProfile();
+        Map<String, String> vars = readEnvFile(profile);
         applyProperties(vars);
         log.info("Загружено {} переменных из {}", vars.size(), ".env");
     }
@@ -89,7 +90,7 @@ public final class DotenvLoader {
      * Прочитать .env файл.
      * Если файл не найден — возвращает пустую карту.
      */
-    private static Map<String, String> readEnvFile() {
+    private static Map<String, String> readEnvFile(String profile) {
         var file = new java.io.File(".env");
         if (!file.exists()) {
             log.error("Файл .env не найден в {}", file.getAbsolutePath());
@@ -103,7 +104,7 @@ public final class DotenvLoader {
             String line;
             while ((line = reader.readLine()) != null) {
                 line = line.trim();
-                currentSection = processLine(line, currentSection, "LOCAL", vars);
+                currentSection = processLine(line, currentSection, vars);
             }
         } catch (IOException e) {
             errorMessage(file.getName(), e.getMessage());
@@ -120,12 +121,12 @@ public final class DotenvLoader {
      * Возвращает обновлённый currentSection.
      */
     private static String processLine(
-            String line, String currentSection, String profile, Map<String, String> vars) {
+            String line, String currentSection, Map<String, String> vars) {
 
         if (isBlankOrComment(line)) {
             return updateSection(line, currentSection);
         }
-        return parseKeyValue(line, currentSection, profile, vars);
+        return parseKeyValue(line, currentSection, vars);
     }
 
     /**
@@ -154,7 +155,7 @@ public final class DotenvLoader {
      * Возвращает currentSection без изменений.
      */
     private static String parseKeyValue(
-            String line, String currentSection, String profile, Map<String, String> vars) {
+            String line, String currentSection, Map<String, String> vars) {
 
         int eq = line.indexOf('=');
         if (eq > 0) {
@@ -162,7 +163,12 @@ public final class DotenvLoader {
             String value = line.substring(eq + 1).trim();
             value = resolveVariables(value, vars);
 
-            if (currentSection == null || currentSection.equals(profile)) {
+            if (currentSection != null && !key.startsWith(currentSection + "_")) {
+                // Добавляем префикс секции, если ключ ещё не имеет его
+                String envKey = currentSection + "_" + key;
+                vars.put(envKey, value);
+            } else {
+                // Ключ уже имеет префикс или section == null (COMMON секция)
                 vars.put(key, value);
             }
         }
