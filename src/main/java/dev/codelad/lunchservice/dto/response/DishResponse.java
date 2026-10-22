@@ -4,6 +4,7 @@ import dev.codelad.lunchservice.entity.Dish;
 import lombok.Data;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -18,6 +19,9 @@ public class DishResponse {
     private boolean isAvailable;
     private Integer quantity;
     private boolean isFreeAddon;
+    private Boolean active;
+    private Boolean hidden;
+    private String dishType;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -32,8 +36,20 @@ public class DishResponse {
         response.isAvailable = dish.isAvailable();
         response.quantity = dish.getQuantity();
         response.isFreeAddon = dish.isFreeAddon();
+        response.active = dish.getActive();
+        response.hidden = dish.getHidden();
+        response.dishType = dish.getDishType();
         response.createdAt = dish.getCreatedAt();
         response.updatedAt = dish.getUpdatedAt();
         return response;
+    }
+
+    public static List<DishResponse> fromList(java.util.List<Dish> dishes) {
+        if (dishes == null) {
+            return List.of();
+        }
+        return dishes.stream()
+                .map(DishResponse::from)
+                .toList();
     }
 }

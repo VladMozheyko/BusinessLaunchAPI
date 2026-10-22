@@ -1,6 +1,7 @@
 package dev.codelad.lunchservice.controller;
 
 import dev.codelad.lunchservice.config.swagger.ApiTags;
+import dev.codelad.lunchservice.security.PermissionService;
 import dev.codelad.lunchservice.security.limiter.InMemoryRateLimiter;
 import dev.codelad.lunchservice.dto.request.CancelByCodeRequest;
 import dev.codelad.lunchservice.dto.request.CancelByPhoneRequest;
@@ -18,7 +19,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,6 +40,7 @@ public class ComboBookingController {
 
     private final ComboBookingService comboBookingService;
     private final InMemoryRateLimiter rateLimiter;
+    private final PermissionService permissionService;
 
     @PostMapping("/combo-booking")
     @Operation(
@@ -151,8 +152,8 @@ public class ComboBookingController {
             tags = {ApiTags.COMBOS, ApiTags.USER}
     )
     @ApiResponse(responseCode = "200", description = "Список бронирований получен")
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<ComboBookingResponse>> getMyComboBookings() {
+        permissionService.checkAuthenticated();
         List<ComboBooking> bookings = comboBookingService.getUserBookings();
         List<ComboBookingResponse> responses = bookings.stream()
                 .map(ComboBookingResponse::from)
@@ -172,10 +173,10 @@ public class ComboBookingController {
     @ApiResponse(responseCode = "200", description = "Бронирование подтверждено")
     @ApiResponse(responseCode = "404", description = "Бронирование не найдено")
     @ApiResponse(responseCode = "409", description = "Бронирование не в статусе PENDING")
-    @PreAuthorize("hasAnyAuthority('ROLE_FRANCHISE_OWNER', 'ROLE_GLOBAL_ADMIN', 'ROLE_LOCATION_ADMIN')")
     public ResponseEntity<ComboBookingResponse> approveComboBooking(
             @Parameter(description = "ID бронирования", required = true)
             @PathVariable java.util.UUID id) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
         ComboBooking approved = comboBookingService.approveBooking(id);
         return ResponseEntity.ok(ComboBookingResponse.from(approved));
     }
@@ -192,10 +193,10 @@ public class ComboBookingController {
     @ApiResponse(responseCode = "200", description = "Бронирование выполнено")
     @ApiResponse(responseCode = "404", description = "Бронирование не найдено")
     @ApiResponse(responseCode = "409", description = "Бронирование не в статусе APPROVED")
-    @PreAuthorize("hasAnyAuthority('ROLE_FRANCHISE_OWNER', 'ROLE_GLOBAL_ADMIN', 'ROLE_LOCATION_ADMIN')")
     public ResponseEntity<ComboBookingResponse> completeComboBooking(
             @Parameter(description = "ID бронирования", required = true)
             @PathVariable java.util.UUID id) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
         ComboBooking completed = comboBookingService.completeBooking(id);
         return ResponseEntity.ok(ComboBookingResponse.from(completed));
     }
@@ -204,20 +205,41 @@ public class ComboBookingController {
     @Operation(
             summary = "Отмена бронирования комбо админом",
             description = """
-                    Отменяет бронирование из любого статуса (кроме CANCELLED и COMPLETED).
+                    Отменяет бронирование из статусов PENDING или APPROVED.
                     Только для FRANCHISE_OWNER, GLOBAL_ADMIN, LOCATION_ADMIN.
                 """,
             tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN}
     )
     @ApiResponse(responseCode = "200", description = "Бронирование отменено")
     @ApiResponse(responseCode = "404", description = "Бронирование не найдено")
-    @ApiResponse(responseCode = "409", description = "Бронирование уже отменено или выполнено")
-    @PreAuthorize("hasAnyAuthority('ROLE_FRANCHISE_OWNER', 'ROLE_GLOBAL_ADMIN', 'ROLE_LOCATION_ADMIN')")
+    @ApiResponse(responseCode = "409", description = "Бронирование не в статусе PENDING или APPROVED")
     public ResponseEntity<ComboBookingResponse> cancelComboBookingByAdmin(
             @Parameter(description = "ID бронирования", required = true)
             @PathVariable java.util.UUID id) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
         ComboBooking cancelled = comboBookingService.cancelByAdmin(id);
         return ResponseEntity.ok(ComboBookingResponse.from(cancelled));
+    }
+
+    @PostMapping("/combo-booking/{id}/mark-no-show")
+    @Operation(
+            summary = "Отметить неявку комбо (NO_SHOW)",
+            description = """
+                    Отмечает бронирование комбо как неявка (пользователь не пришёл).
+                    Increment noShowCount для пользователя.
+                    Только для FRANCHISE_OWNER, GLOBAL_ADMIN, LOCATION_ADMIN.
+                """,
+            tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN}
+    )
+    @ApiResponse(responseCode = "200", description = "Бронирование отмечено как NO_SHOW")
+    @ApiResponse(responseCode = "404", description = "Бронирование не найдено")
+    @ApiResponse(responseCode = "409", description = "Бронирование уже завершено или отменено")
+    public ResponseEntity<ComboBookingResponse> markComboNoShow(
+            @Parameter(description = "ID бронирования", required = true)
+            @PathVariable java.util.UUID id) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
+        ComboBooking marked = comboBookingService.markNoShow(id);
+        return ResponseEntity.ok(ComboBookingResponse.from(marked));
     }
 
     /**

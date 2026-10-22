@@ -4,10 +4,14 @@ import dev.codelad.lunchservice.constant.Messages;
 import dev.codelad.lunchservice.dto.request.CreateLunchBookingRequest;
 import dev.codelad.lunchservice.entity.*;
 import dev.codelad.lunchservice.enums.BookingStatus;
+import dev.codelad.lunchservice.enums.NotificationEventType;
 import dev.codelad.lunchservice.exception.BookingConflictException;
 import dev.codelad.lunchservice.exception.ResourceNotFoundException;
+import dev.codelad.lunchservice.exception.ValidationException;
+import dev.codelad.lunchservice.listener.NotificationEventPublisher;
 import dev.codelad.lunchservice.repository.DishRepository;
 import dev.codelad.lunchservice.repository.LunchBookingRepository;
+import dev.codelad.lunchservice.repository.UserRepository;
 import dev.codelad.lunchservice.repository.VenueProfileRepository;
 import dev.codelad.lunchservice.repository.VenueScheduleRepository;
 import dev.codelad.lunchservice.security.SecurityContextHelper;
@@ -19,7 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 @Slf4j
@@ -32,6 +38,8 @@ public class LunchBookingService {
     private final VenueProfileRepository venueProfileRepository;
     private final VenueScheduleRepository venueScheduleRepository;
     private final SecurityContextHelper securityContextHelper;
+    private final NotificationEventPublisher notificationEventPublisher;
+    private final UserRepository userRepository;
 
     @Transactional
     public LunchBooking createLunchBooking(CreateLunchBookingRequest request) {
@@ -63,6 +71,9 @@ public class LunchBookingService {
         LunchBooking saved = lunchBookingRepository.save(booking);
         log.info("[LUNCH_BOOKING_CREATED] Бронирование {} создано: venue={}, time={}, guests={}",
                 saved.getId(), request.getVenueId(), request.getTime(), totalGuests);
+
+        // Отправляем push-уведомление пользователю
+        sendBookingCreatedNotification(saved, venue.getName());
 
         return saved;
     }
@@ -176,12 +187,21 @@ public class LunchBookingService {
     private LunchBooking buildBooking(
             CreateLunchBookingRequest request, VenueProfile venue, List<LunchOrderItem> items) {
 
+        // Получаем текущий noShowCount для пользователя
+        Integer currentNoShowCount = 0;
+        String externalIdStr = securityContextHelper.getCurrentExternalId();
+        var userOpt = userRepository.findByExternalId(externalIdStr);
+        if (userOpt.isPresent()) {
+            currentNoShowCount = userOpt.get().getNoShowCount() != null ? userOpt.get().getNoShowCount() : 0;
+        }
+
         LunchBooking booking = LunchBooking.builder()
-                .userId(securityContextHelper.getCurrentExternalId())
+                .userId(externalIdStr)
                 .venue(venue)
                 .time(request.getTime())
                 .status(BookingStatus.PENDING)
                 .items(items)
+                .noShowCount(currentNoShowCount)
                 .build();
 
         for (LunchOrderItem item : items) {
@@ -214,6 +234,9 @@ public class LunchBookingService {
         LunchBooking cancelled = cancelBooking(booking);
 
         log.info("[LUNCH_BOOKING_CANCELLED] Бронирование {} отменено по коду: {}", cancelled.getId(), cancelCode);
+
+        // Отправляем push-уведомление пользователю
+        sendBookingCancelledNotification(cancelled, cancelled.getVenue().getName());
 
         return cancelled;
     }
@@ -249,6 +272,9 @@ public class LunchBookingService {
         log.info("[LUNCH_BOOKING_CANCELLED] Бронирование {} отменено по коду и телефону: {}, phone={}",
                 cancelled.getId(), cancelCode, phoneNumber);
 
+        // Отправляем push-уведомление пользователю
+        sendBookingCancelledNotification(cancelled, cancelled.getVenue().getName());
+
         return cancelled;
     }
 
@@ -277,10 +303,21 @@ public class LunchBookingService {
         }
 
         booking.setStatus(BookingStatus.APPROVED);
+        // Устанавливаем время истечения: booking.time + 40 минут
+        java.time.LocalDateTime expiredAtDateTime = java.time.LocalDateTime.of(
+                java.time.LocalDate.now(),
+                booking.getTime()
+        ).plusMinutes(40);
+        booking.setExpiredAt(expiredAtDateTime.toInstant(
+                java.time.ZoneOffset.systemDefault().getRules().getOffset(expiredAtDateTime)
+        ));
         LunchBooking approved = lunchBookingRepository.save(booking);
 
         log.info("[LUNCH_BOOKING_APPROVED] Бронирование {} подтверждено: venue={}, time={}",
                 approved.getId(), approved.getVenue().getId(), approved.getTime());
+
+        // Отправляем push-уведомление пользователю
+        sendBookingApprovedNotification(approved, approved.getVenue().getName());
 
         return approved;
     }
@@ -315,16 +352,19 @@ public class LunchBookingService {
         log.info("[LUNCH_BOOKING_COMPLETED] Бронирование {} выполнено: venue={}, time={}",
                 completed.getId(), completed.getVenue().getId(), completed.getTime());
 
+        // Отправляем push-уведомление пользователю
+        sendBookingCompletedNotification(completed, completed.getVenue().getName());
+
         return completed;
     }
 
     /**
-     * Отменить бронирование админом (любой статус → CANCELLED).
+     * Отменить бронирование админом (PENDING или APPROVED → CANCELLED).
      * Только для FRANCHISE_OWNER, GLOBAL_ADMIN, LOCATION_ADMIN.
      * @param bookingId ID бронирования
      * @return отменённое бронирование
      * @throws ResourceNotFoundException если бронирование не найдено
-     * @throws BookingConflictException если бронирование уже отменено или выполнено
+     * @throws BookingConflictException если бронирование не в статусе PENDING или APPROVED
      */
     @Transactional
     public LunchBooking cancelByAdmin(java.util.UUID bookingId) {
@@ -336,10 +376,19 @@ public class LunchBookingService {
         }
 
         LunchBooking booking = bookingOpt.get();
+
+        if (booking.getStatus() != BookingStatus.PENDING && booking.getStatus() != BookingStatus.APPROVED) {
+            throw new BookingConflictException(
+                    String.format("Бронирование можно отменить только из статусов PENDING или APPROVED. Текущий статус: %s", booking.getStatus()));
+        }
+
         LunchBooking cancelled = cancelBooking(booking);
 
         log.info("[LUNCH_BOOKING_CANCELLED_BY_ADMIN] Бронирование {} отменено админом: venue={}, time={}",
                 cancelled.getId(), cancelled.getVenue().getId(), cancelled.getTime());
+
+        // Отправляем push-уведомление пользователю
+        sendBookingCancelledByAdminNotification(cancelled, cancelled.getVenue().getName());
 
         return cancelled;
     }
@@ -350,10 +399,10 @@ public class LunchBookingService {
      */
     @Transactional(readOnly = true)
     public List<LunchBooking> getUserBookings() {
-        java.util.UUID currentUserId = securityContextHelper.getCurrentExternalId();
-        List<LunchBooking> bookings = lunchBookingRepository.findByUserIdOrderByCreatedAtDesc(currentUserId);
+        String externalIdStr = securityContextHelper.getCurrentExternalId();
+        List<LunchBooking> bookings = lunchBookingRepository.findByUserIdOrderByCreatedAtDesc(externalIdStr);
         log.info("[USER_BOOKINGS] Получены бронирования для пользователя {}: {} шт.",
-                currentUserId, bookings.size());
+                externalIdStr, bookings.size());
         return bookings;
     }
 
@@ -405,5 +454,175 @@ public class LunchBookingService {
         }
         booking.setStatus(BookingStatus.CANCELLED);
         return lunchBookingRepository.save(booking);
+    }
+
+    /**
+     * Отметить бронирование как NO_SHOW (неявка).
+     * Только для администраторов.
+     * @param bookingId ID бронирования
+     * @return отмеченное бронирование
+     */
+    @Transactional
+    public LunchBooking markNoShow(java.util.UUID bookingId) {
+        var bookingOpt = lunchBookingRepository.findById(bookingId);
+
+        if (bookingOpt.isEmpty()) {
+            throw new ResourceNotFoundException(
+                    String.format(Messages.BOOKING_NOT_FOUND, bookingId));
+        }
+
+        LunchBooking booking = bookingOpt.get();
+
+        if (booking.getStatus() == BookingStatus.COMPLETED || booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new BookingConflictException(
+                    String.format("Нельзя отметить как NO_SHOW бронирование со статусом %s", booking.getStatus()));
+        }
+
+        booking.setStatus(BookingStatus.NO_SHOW);
+
+        // Increment noShowCount для пользователя
+        if (booking.getUserId() != null) {
+            var userOpt = userRepository.findByExternalId(booking.getUserId());
+            if (userOpt.isPresent()) {
+                User user = userOpt.get();
+                user.setNoShowCount((user.getNoShowCount() != null ? user.getNoShowCount() : 0) + 1);
+                userRepository.save(user);
+            }
+        }
+
+        LunchBooking marked = lunchBookingRepository.save(booking);
+        log.info("[BOOKING_NO_SHOW] Бронирование {} отмечено как неявка", bookingId);
+
+        return marked;
+    }
+
+    // ==================== Методы для отправки уведомлений ====================
+
+    /**
+     * Отправляет уведомление о создании брони.
+     */
+    private void sendBookingCreatedNotification(LunchBooking booking, String venueName) {
+        try {
+            String userId = securityContextHelper.getCurrentExternalId().toString();
+            
+            Map<String, String> templateData = new HashMap<>();
+            templateData.put("venue", venueName);
+            templateData.put("bookingId", booking.getId().toString());
+            templateData.put("time", booking.getTime().toString());
+            templateData.put("guests", String.valueOf(booking.getTotalGuests()));
+
+            notificationEventPublisher.publishLunchBookingEvent(
+                    userId,
+                    NotificationEventType.BOOKING_CREATED,
+                    "Бронь создана",
+                    "Ваша бронь в " + venueName + " создана. Время: " + booking.getTime() + ", гостей: " + booking.getTotalGuests(),
+                    templateData,
+                    null // JWT токен не нужен для публичного endpoint
+            );
+        } catch (Exception e) {
+            log.error("[NOTIFICATION_ERROR] Failed to send booking created notification: bookingId={}, error={}",
+                    booking.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Отправляет уведомление об отмене брони.
+     */
+    private void sendBookingCancelledNotification(LunchBooking booking, String venueName) {
+        try {
+            String userId = securityContextHelper.getCurrentExternalId().toString();
+            
+            Map<String, String> templateData = new HashMap<>();
+            templateData.put("venue", venueName);
+            templateData.put("bookingId", booking.getId().toString());
+
+            notificationEventPublisher.publishLunchBookingEvent(
+                    userId,
+                    NotificationEventType.BOOKING_CANCELLED,
+                    "Бронь отменена",
+                    "Ваша бронь в " + venueName + " отменена.",
+                    templateData,
+                    null
+            );
+        } catch (Exception e) {
+            log.error("[NOTIFICATION_ERROR] Failed to send booking cancelled notification: bookingId={}, error={}",
+                    booking.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Отправляет уведомление об отмене брони администратором.
+     */
+    private void sendBookingCancelledByAdminNotification(LunchBooking booking, String venueName) {
+        try {
+            String userId = securityContextHelper.getCurrentExternalId().toString();
+            
+            Map<String, String> templateData = new HashMap<>();
+            templateData.put("venue", venueName);
+            templateData.put("bookingId", booking.getId().toString());
+
+            notificationEventPublisher.publishLunchBookingEvent(
+                    userId,
+                    NotificationEventType.BOOKING_CANCELLED_BY_ADMIN,
+                    "Бронь отменена админом",
+                    "Ваша бронь в " + venueName + " отменена администратором.",
+                    templateData,
+                    null
+            );
+        } catch (Exception e) {
+            log.error("[NOTIFICATION_ERROR] Failed to send booking cancelled by admin notification: bookingId={}, error={}",
+                    booking.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Отправляет уведомление об одобрении брони.
+     */
+    private void sendBookingApprovedNotification(LunchBooking booking, String venueName) {
+        try {
+            String userId = securityContextHelper.getCurrentExternalId().toString();
+            
+            Map<String, String> templateData = new HashMap<>();
+            templateData.put("venue", venueName);
+            templateData.put("bookingId", booking.getId().toString());
+            templateData.put("time", booking.getTime().toString());
+
+            notificationEventPublisher.publishLunchBookingEvent(
+                    userId,
+                    NotificationEventType.BOOKING_APPROVED,
+                    "Бронь одобрена",
+                    "Ваша бронь в " + venueName + " одобрена. Время: " + booking.getTime(),
+                    templateData,
+                    null
+            );
+        } catch (Exception e) {
+            log.error("[NOTIFICATION_ERROR] Failed to send booking approved notification: bookingId={}, error={}",
+                    booking.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Отправляет уведомление о завершении брони.
+     */
+    private void sendBookingCompletedNotification(LunchBooking booking, String venueName) {
+        try {
+            String userId = securityContextHelper.getCurrentExternalId().toString();
+            
+            Map<String, String> templateData = new HashMap<>();
+            templateData.put("venue", venueName);
+            templateData.put("bookingId", booking.getId().toString());
+
+            notificationEventPublisher.publishLunchBookingEvent(
+                    userId,
+                    NotificationEventType.BOOKING_COMPLETED,
+                    "Бронь завершена",
+                    "Ваша бронь в " + venueName + " завершена. Спасибо, что пришли!",
+                    templateData,
+                    null
+            );
+        } catch (Exception e) {
+            log.error("[NOTIFICATION_ERROR] Failed to send booking completed notification: bookingId={}, error={}",
+                    booking.getId(), e.getMessage(), e);
+        }
     }
 }

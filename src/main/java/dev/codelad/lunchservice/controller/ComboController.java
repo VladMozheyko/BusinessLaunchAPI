@@ -2,10 +2,12 @@ package dev.codelad.lunchservice.controller;
 
 import dev.codelad.lunchservice.config.swagger.ApiTags;
 import dev.codelad.lunchservice.dto.request.CreateComboRequest;
+import dev.codelad.lunchservice.dto.request.UpdateComboRequest;
 import dev.codelad.lunchservice.dto.request.UpdateComboStatusRequest;
 import dev.codelad.lunchservice.dto.response.ComboFullResponse;
 import dev.codelad.lunchservice.dto.response.ComboResponse;
 import dev.codelad.lunchservice.entity.Combo;
+import dev.codelad.lunchservice.security.PermissionService;
 import dev.codelad.lunchservice.service.ComboService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -15,7 +17,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -38,6 +39,7 @@ import java.util.List;
 public class ComboController {
 
     private final ComboService comboService;
+    private final PermissionService permissionService;
 
     @GetMapping("/combo")
     @Operation(
@@ -79,10 +81,10 @@ public class ComboController {
     )
     @ApiResponse(responseCode = "201", description = "Комбо успешно создано")
     @ApiResponse(responseCode = "400", description = "Ошибка валидации данных")
-    @PreAuthorize("hasAnyAuthority('ROLE_GLOBAL_ADMIN', 'ROLE_FRANCHISE_OWNER')")
     public ResponseEntity<ComboResponse> createCombo(
             @Parameter(description = "Данные для создания комбо", required = true)
             @Valid @RequestBody CreateComboRequest request) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
         Combo combo = comboService.createCombo(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ComboResponse.from(combo));
     }
@@ -97,10 +99,10 @@ public class ComboController {
             tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
     )
     @ApiResponse(responseCode = "200", description = "Список комбо")
-    @PreAuthorize("hasAnyAuthority('ROLE_GLOBAL_ADMIN', 'ROLE_FRANCHISE_OWNER', 'ROLE_LOCATION_ADMIN')")
     public List<ComboResponse> findMyCombosByVenueId(
             @Parameter(description = "ID заведения", required = true)
             @RequestParam Long venueId) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
         return comboService.findByVenueId(venueId);
     }
 
@@ -115,34 +117,76 @@ public class ComboController {
     )
     @ApiResponse(responseCode = "200", description = "Статус комбо обновлён")
     @ApiResponse(responseCode = "404", description = "Комбо не найдено")
-    @PreAuthorize("hasAnyAuthority('ROLE_GLOBAL_ADMIN', 'ROLE_FRANCHISE_OWNER', 'ROLE_LOCATION_ADMIN')")
     public ResponseEntity<ComboResponse> updateComboStatus(
             @Parameter(description = "ID комбо", required = true)
             @PathVariable Long id,
             @Parameter(description = "Новое значение isActive", required = true)
             @Valid @RequestBody UpdateComboStatusRequest request) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
         Combo combo = comboService.updateComboStatus(id, request);
+        return ResponseEntity.ok(ComboResponse.from(combo));
+    }
+
+    @PatchMapping("/combo/{id}")
+    @Operation(
+            summary = "Обновление параметров комбо",
+            description = """
+                    Обновляет название, цену и/или дневной лимит комбо.
+                    Доступно для GL, FO и LA.
+                """,
+            tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
+    )
+    @ApiResponse(responseCode = "200", description = "Комбо обновлено")
+    @ApiResponse(responseCode = "404", description = "Комбо не найдено")
+    public ResponseEntity<ComboResponse> updateCombo(
+            @Parameter(description = "ID комбо", required = true)
+            @PathVariable Long id,
+            @Parameter(description = "Новые значения name, price, dailyLimit", required = true)
+            @Valid @RequestBody UpdateComboRequest request) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
+        Combo combo = comboService.updateCombo(id, request);
         return ResponseEntity.ok(ComboResponse.from(combo));
     }
 
     @DeleteMapping("/combo/{id}")
     @Operation(
-            summary = "Удаление комбо",
+            summary = "Скрыть комбо (мягкое удаление)",
             description = """
-                    Полное удаление комбо-набора.
-                    Нельзя удалить комбо с активными заказами (PENDING, APPROVED).
-                    Сначала установите isActive = false, дождитесь выполнения заказов, затем удалите.
+                    Скрывает комбо-набор (устанавливает isHidden=true).
+                    Нельзя скрыть комбо с активными заказами.
+                    Доступно для GL, FO и LA.
                 """,
             tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
     )
-    @ApiResponse(responseCode = "204", description = "Комбо удалено")
+    @ApiResponse(responseCode = "204", description = "Комбо скрыто")
     @ApiResponse(responseCode = "404", description = "Комбо не найдено")
-    @ApiResponse(responseCode = "409", description = "Нельзя удалить: есть активные заказы")
-    @PreAuthorize("hasAnyAuthority('ROLE_GLOBAL_ADMIN', 'ROLE_FRANCHISE_OWNER', 'ROLE_LOCATION_ADMIN')")
-    public ResponseEntity<Void> deleteCombo(
+    @ApiResponse(responseCode = "409", description = "Нельзя скрыть: есть активные заказы")
+    public ResponseEntity<Void> hideCombo(
             @Parameter(description = "ID комбо", required = true)
             @PathVariable Long id) {
-        comboService.deleteCombo(id);
+        permissionService.checkGlobalAdminOrOwnerAccess();
+        comboService.hideCombo(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/combo/{id}/hard")
+    @Operation(
+            summary = "Физическое удаление комбо",
+            description = """
+                    Полное физическое удаление комбо-набора.
+                    Нельзя удалить комбо с активными заказами.
+                    Только для GLOBAL_ADMIN.
+                """,
+            tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN}
+    )
+    @ApiResponse(responseCode = "204", description = "Комбо физически удалено")
+    @ApiResponse(responseCode = "404", description = "Комбо не найдено")
+    @ApiResponse(responseCode = "409", description = "Нельзя удалить: есть активные заказы или комбо скрыто")
+    public ResponseEntity<Void> hardDeleteCombo(
+            @Parameter(description = "ID комбо", required = true)
+            @PathVariable Long id) {
+        permissionService.checkGlobalAdminAccess();
+        comboService.hardDeleteCombo(id);
         return ResponseEntity.noContent().build();
     }
 }

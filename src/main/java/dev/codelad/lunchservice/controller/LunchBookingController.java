@@ -1,6 +1,7 @@
 package dev.codelad.lunchservice.controller;
 
 import dev.codelad.lunchservice.config.swagger.ApiTags;
+import dev.codelad.lunchservice.security.PermissionService;
 import dev.codelad.lunchservice.security.limiter.InMemoryRateLimiter;
 import dev.codelad.lunchservice.dto.request.CancelByCodeRequest;
 import dev.codelad.lunchservice.dto.request.CancelByPhoneRequest;
@@ -18,7 +19,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -39,6 +39,7 @@ public class LunchBookingController {
 
     private final LunchBookingService lunchBookingService;
     private final InMemoryRateLimiter rateLimiter;
+    private final PermissionService permissionService;
 
     @PostMapping("/booking")
     @Operation(
@@ -53,10 +54,10 @@ public class LunchBookingController {
     @ApiResponse(responseCode = "400", description = "Ошибка валидации данных")
     @ApiResponse(responseCode = "404", description = "Локация или блюдо не найдено")
     @ApiResponse(responseCode = "409", description = "Нет мест для бронирования")
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<LunchBookingResponse> createLunchBooking(
             @Parameter(description = "Данные для бронирования: локация, время, список блюд", required = true)
             @Valid @RequestBody CreateLunchBookingRequest request) {
+        permissionService.checkAuthenticated();
         LunchBooking booking = lunchBookingService.createLunchBooking(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(LunchBookingResponse.from(booking));
     }
@@ -71,8 +72,8 @@ public class LunchBookingController {
             tags = {ApiTags.LUNCH_BOOKINGS, ApiTags.USER}
     )
     @ApiResponse(responseCode = "200", description = "Список бронирований получен")
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<LunchBookingResponse>> getMyBookings() {
+        permissionService.checkAuthenticated();
         List<LunchBooking> bookings = lunchBookingService.getUserBookings();
         List<LunchBookingResponse> responses = bookings.stream()
                 .map(LunchBookingResponse::from)
@@ -91,10 +92,10 @@ public class LunchBookingController {
     )
     @ApiResponse(responseCode = "200", description = "Бронирование найдено")
     @ApiResponse(responseCode = "404", description = "Бронирование не найдено или нет доступа")
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<LunchBookingResponse> getBooking(
             @Parameter(description = "ID бронирования", required = true)
             @PathVariable("id") java.util.UUID id) {
+        permissionService.checkAuthenticated();
         LunchBooking booking = lunchBookingService.getBookingById(id);
         return ResponseEntity.ok(LunchBookingResponse.from(booking));
     }
@@ -172,10 +173,10 @@ public class LunchBookingController {
     @ApiResponse(responseCode = "200", description = "Бронирование подтверждено")
     @ApiResponse(responseCode = "404", description = "Бронирование не найдено")
     @ApiResponse(responseCode = "409", description = "Бронирование не в статусе PENDING")
-    @PreAuthorize("hasAnyAuthority('ROLE_FRANCHISE_OWNER', 'ROLE_GLOBAL_ADMIN', 'ROLE_LOCATION_ADMIN')")
     public ResponseEntity<LunchBookingResponse> approveBooking(
             @Parameter(description = "ID бронирования", required = true)
             @PathVariable("id") java.util.UUID id) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
         LunchBooking approved = lunchBookingService.approveBooking(id);
         return ResponseEntity.ok(LunchBookingResponse.from(approved));
     }
@@ -192,10 +193,10 @@ public class LunchBookingController {
     @ApiResponse(responseCode = "200", description = "Бронирование выполнено")
     @ApiResponse(responseCode = "404", description = "Бронирование не найдено")
     @ApiResponse(responseCode = "409", description = "Бронирование не в статусе APPROVED")
-    @PreAuthorize("hasAnyAuthority('ROLE_FRANCHISE_OWNER', 'ROLE_GLOBAL_ADMIN', 'ROLE_LOCATION_ADMIN')")
     public ResponseEntity<LunchBookingResponse> completeBooking(
             @Parameter(description = "ID бронирования", required = true)
             @PathVariable("id") java.util.UUID id) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
         LunchBooking completed = lunchBookingService.completeBooking(id);
         return ResponseEntity.ok(LunchBookingResponse.from(completed));
     }
@@ -204,20 +205,41 @@ public class LunchBookingController {
     @Operation(
             summary = "Отмена бронирования админом",
             description = """
-                    Отменяет бронирование из любого статуса (кроме CANCELLED и COMPLETED).
+                    Отменяет бронирование из статусов PENDING или APPROVED.
                     Только для FRANCHISE_OWNER, GLOBAL_ADMIN, LOCATION_ADMIN.
                 """,
             tags = {ApiTags.LUNCH_BOOKINGS, ApiTags.GLOBAL_ADMIN}
     )
     @ApiResponse(responseCode = "200", description = "Бронирование отменено")
     @ApiResponse(responseCode = "404", description = "Бронирование не найдено")
-    @ApiResponse(responseCode = "409", description = "Бронирование уже отменено или выполнено")
-    @PreAuthorize("hasAnyAuthority('ROLE_FRANCHISE_OWNER', 'ROLE_GLOBAL_ADMIN', 'ROLE_LOCATION_ADMIN')")
+    @ApiResponse(responseCode = "409", description = "Бронирование не в статусе PENDING или APPROVED")
     public ResponseEntity<LunchBookingResponse> cancelByAdmin(
             @Parameter(description = "ID бронирования", required = true)
             @PathVariable("id") java.util.UUID id) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
         LunchBooking cancelled = lunchBookingService.cancelByAdmin(id);
         return ResponseEntity.ok(LunchBookingResponse.from(cancelled));
+    }
+
+    @PostMapping("/booking/{id}/mark-no-show")
+    @Operation(
+            summary = "Отметить неявку (NO_SHOW)",
+            description = """
+                    Отмечает бронирование как неявка (пользователь не пришёл).
+                    Increment noShowCount для пользователя.
+                    Только для FRANCHISE_OWNER, GLOBAL_ADMIN, LOCATION_ADMIN.
+                """,
+            tags = {ApiTags.LUNCH_BOOKINGS, ApiTags.GLOBAL_ADMIN}
+    )
+    @ApiResponse(responseCode = "200", description = "Бронирование отмечено как NO_SHOW")
+    @ApiResponse(responseCode = "404", description = "Бронирование не найдено")
+    @ApiResponse(responseCode = "409", description = "Бронирование уже завершено или отменено")
+    public ResponseEntity<LunchBookingResponse> markNoShow(
+            @Parameter(description = "ID бронирования", required = true)
+            @PathVariable("id") java.util.UUID id) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
+        LunchBooking marked = lunchBookingService.markNoShow(id);
+        return ResponseEntity.ok(LunchBookingResponse.from(marked));
     }
 
     /**

@@ -12,9 +12,9 @@ import java.util.List;
 public interface ComboRepository extends JpaRepository<Combo, Long> {
 
     /**
-     * Найти все комбо для заведения.
+     * Найти все активные (не скрытые) комбо для заведения.
      */
-    List<Combo> findByVenueId(Long venueId);
+    List<Combo> findByVenueIdAndHiddenFalse(Long venueId);
 
     /**
      * Проверить, есть ли активные заказы для блюд в категориях комбо.

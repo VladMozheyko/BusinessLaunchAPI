@@ -30,9 +30,9 @@ public class VenueProfileService {
      * Создать или обновить карточку заведения.
      */
     @Transactional
-    public VenueProfileResponse createOrUpdate(UUID franchiseUserId, VenueProfileRequest request) {
-        VenueProfile profile = updateExisting(franchiseUserId, request)
-                .orElseGet(() -> createNew(franchiseUserId, request));
+    public VenueProfileResponse createOrUpdate(String externalIdStr, VenueProfileRequest request) {
+        VenueProfile profile = updateExisting(externalIdStr, request)
+                .orElseGet(() -> createNew(externalIdStr, request));
 
         List<VenueSchedule> schedules = venueScheduleRepository.findByVenueProfileIdOrderByDayOfWeekAsc(profile.getId());
         return VenueProfileResponse.from(profile, schedules);
@@ -42,18 +42,15 @@ public class VenueProfileService {
      * Обновить существующую карточку, если она есть.
      */
     private java.util.Optional<VenueProfile> updateExisting(
-            UUID franchiseUserId, VenueProfileRequest request) {
+            String externalIdStr, VenueProfileRequest request) {
 
-        if (!venueProfileRepository.existsByFranchiseUserId(franchiseUserId)) {
+        // Ищем по ownerUserId (в новой модели это externalId из Bar Auth JWT)
+        List<VenueProfile> existing = venueProfileRepository.findByExternalId(externalIdStr);
+        if (existing.isEmpty()) {
             return java.util.Optional.empty();
         }
 
-        List<VenueProfile> existing = venueProfileRepository.findByFranchiseUserId(franchiseUserId);
-        VenueProfile profile = existing.isEmpty() ? null : existing.getFirst();
-        if (profile == null) {
-            return java.util.Optional.empty();
-        }
-
+        VenueProfile profile = existing.getFirst();
         updateProfileFields(profile, request);
         replaceSchedules(profile.getId(), request.getSchedules());
 
@@ -89,14 +86,13 @@ public class VenueProfileService {
     /**
      * Создать новую карточку заведения.
      */
-    private VenueProfile createNew(UUID franchiseUserId, VenueProfileRequest request) {
+    private VenueProfile createNew(String externalIdStr, VenueProfileRequest request) {
         VenueProfile profile = VenueProfile.builder()
-                .franchiseUserId(franchiseUserId)
+                .externalId(externalIdStr)
                 .venueId(request.getVenueId())
                 .name(request.getName())
                 .description(request.getDescription())
                 .logoUrl(request.getLogoUrl())
-                .active(true)
                 .build();
 
         profile = venueProfileRepository.save(profile);
@@ -136,11 +132,25 @@ public class VenueProfileService {
     }
 
     /**
-     * Получить активную карточку заведения франчайзи.
+     * Получить активную карточку заведения по externalId (userUuid или user_id как String).
      */
-    public VenueProfileResponse getByFranchiseUserId(UUID franchiseUserId) {
-        VenueProfile profile = venueProfileRepository.findByFranchiseUserIdAndActiveIsTrue(franchiseUserId)
-                .orElseThrow(() -> new RuntimeException("Активная карточка заведения не найдена для пользователя: " + franchiseUserId));
+    public VenueProfileResponse getByOwnerUserId(String externalIdStr) {
+        List<VenueProfile> profiles = venueProfileRepository.findByExternalId(externalIdStr);
+        if (profiles.isEmpty()) {
+            throw new RuntimeException("Карточка заведения не найдена для пользователя: " + externalIdStr);
+        }
+        VenueProfile profile = profiles.getFirst();
+
+        List<VenueSchedule> schedules = venueScheduleRepository.findByVenueProfileIdOrderByDayOfWeekAsc(profile.getId());
+        return VenueProfileResponse.from(profile, schedules);
+    }
+
+    /**
+     * Получить карточку заведения по venueId (из Bar Auth JWT).
+     */
+    public VenueProfileResponse getByVenueId(Long venueId) {
+        VenueProfile profile = venueProfileRepository.findByVenueId(venueId)
+                .orElseThrow(() -> new RuntimeException("Карточка заведения не найдена с venueId: " + venueId));
 
         List<VenueSchedule> schedules = venueScheduleRepository.findByVenueProfileIdOrderByDayOfWeekAsc(profile.getId());
         return VenueProfileResponse.from(profile, schedules);

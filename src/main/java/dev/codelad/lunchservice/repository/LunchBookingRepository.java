@@ -52,7 +52,7 @@ public interface LunchBookingRepository extends JpaRepository<LunchBooking, java
     /**
      * Найти все бронирования пользователя, отсортированные по дате создания (новые первые).
      */
-    List<LunchBooking> findByUserIdOrderByCreatedAtDesc(java.util.UUID userId);
+    List<LunchBooking> findByUserIdOrderByCreatedAtDesc(String userId);
 
     /**
      * Проверить, есть ли активные заказы с данным блюдом.
@@ -62,4 +62,22 @@ public interface LunchBookingRepository extends JpaRepository<LunchBooking, java
            "WHERE i.dish.id = :dishId " +
            "AND b.status IN ('PENDING', 'APPROVED')")
     boolean existsByDishIdAndActiveOrders(@Param("dishId") java.util.UUID dishId);
+
+    /**
+     * Найти все NO_SHOW бронирования для пользователя.
+     */
+    @Query("SELECT b FROM LunchBooking b WHERE b.status = 'NO_SHOW' AND b.userId = :userId")
+    List<LunchBooking> findByUserIdAndNoShow(@Param("userId") java.util.UUID userId);
+
+    /**
+     * Найти все NO_SHOW бронирования для телефона.
+     */
+    @Query("SELECT b FROM LunchBooking b WHERE b.status = 'NO_SHOW' AND b.phoneNumber = :phone")
+    List<LunchBooking> findByPhoneAndNoShow(@Param("phone") String phone);
+
+    /**
+     * Найти все просроченные APPROVED бронирования для scheduled task.
+     */
+    @Query("SELECT b FROM LunchBooking b WHERE b.status = 'APPROVED' AND b.expiredAt < :now")
+    List<LunchBooking> findExpiredApprovedBookings(@Param("now") java.time.Instant now);
 }

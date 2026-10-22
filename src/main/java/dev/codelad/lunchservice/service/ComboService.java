@@ -1,6 +1,7 @@
 package dev.codelad.lunchservice.service;
 
 import dev.codelad.lunchservice.dto.request.CreateComboRequest;
+import dev.codelad.lunchservice.dto.request.UpdateComboRequest;
 import dev.codelad.lunchservice.dto.request.UpdateComboStatusRequest;
 import dev.codelad.lunchservice.dto.response.ComboFullResponse;
 import dev.codelad.lunchservice.dto.response.ComboResponse;
@@ -8,6 +9,7 @@ import dev.codelad.lunchservice.entity.Category;
 import dev.codelad.lunchservice.entity.Combo;
 import dev.codelad.lunchservice.entity.Dish;
 import dev.codelad.lunchservice.exception.ResourceNotFoundException;
+import dev.codelad.lunchservice.exception.ValidationException;
 import dev.codelad.lunchservice.repository.CategoryRepository;
 import dev.codelad.lunchservice.repository.ComboRepository;
 import dev.codelad.lunchservice.repository.DishRepository;
@@ -65,6 +67,7 @@ public class ComboService {
                 .price(request.getPrice())
                 .dailyLimit(request.getDailyLimit())
                 .isActive(request.getIsActive() != null && request.getIsActive())
+                .hidden(false)
                 .categories(categories)
                 .freeAddons(freeAddons)
                 .build();
@@ -73,23 +76,25 @@ public class ComboService {
     }
 
     /**
-     * Получить все комбо для заведения.
+     * Получить все активные (не скрытые) комбо для заведения.
      */
     @Transactional(readOnly = true)
     public List<ComboResponse> findByVenueId(Long venueId) {
-        List<Combo> combos = comboRepository.findByVenueId(venueId);
+        List<Combo> combos = comboRepository.findByVenueIdAndHiddenFalse(venueId);
         return combos.stream()
                 .map(ComboResponse::from)
                 .toList();
     }
 
     /**
-     * Получить все комбо с деталями (категории, блюда, дополнения).
+     * Получить все активные комбо с деталями (категории, блюда, дополнения).
      * Для публичного доступа.
      */
     @Transactional(readOnly = true)
     public List<ComboFullResponse> findAllWithDetails() {
-        List<Combo> combos = comboRepository.findAll();
+        List<Combo> combos = comboRepository.findAll().stream()
+                .filter(c -> !c.getHidden())
+                .toList();
         return combos.stream()
                 .map(ComboFullResponse::from)
                 .toList();
@@ -123,15 +128,76 @@ public class ComboService {
     }
 
     /**
-     * Удалить комбо по ID.
+     * Скрыть комбо (мягкое удаление).
+     * Блокирует удаление, если есть активные заказы.
+     */
+    @Transactional
+    public void hideCombo(Long comboId) {
+        Combo combo = comboRepository.findById(comboId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Комбо с ID " + comboId + " не найдено"));
+
+        if (comboRepository.existsActiveOrders(comboId)) {
+            throw new ValidationException(
+                    "Нельзя скрыть комбо с активными заказами. Установите isActive=false и дождитесь выполнения заказов.");
+        }
+
+        combo.setHidden(true);
+        comboRepository.save(combo);
+        log.info("[COMBO_HIDDEN] Комбо {} скрыто", comboId);
+    }
+
+    /**
+     * Физическое удаление комбо (только GLOBAL_ADMIN).
+     */
+    @Transactional
+    public void hardDeleteCombo(Long comboId) {
+        Combo combo = comboRepository.findById(comboId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Комбо с ID " + comboId + " не найдено"));
+
+        if (combo.getHidden()) {
+            throw new ValidationException(
+                    "Нельзя физически удалить скрытое комбо. Используйте soft delete.");
+        }
+
+        if (comboRepository.existsActiveOrders(comboId)) {
+            throw new ValidationException(
+                    "Нельзя физически удалить комбо с активными заказами.");
+        }
+
+        comboRepository.delete(combo);
+        log.info("[COMBO_HARD_DELETED] Комбо {} физически удалено", comboId);
+    }
+
+    /**
+     * Обновить параметры комбо (название, цена, дневной лимит).
+     */
+    @Transactional
+    public Combo updateCombo(Long comboId, UpdateComboRequest request) {
+        Combo combo = comboRepository.findById(comboId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Комбо с ID " + comboId + " не найдено"));
+
+        if (request.getName() != null) {
+            combo.setName(request.getName());
+        }
+        if (request.getPrice() != null) {
+            combo.setPrice(request.getPrice());
+        }
+        if (request.getDailyLimit() != null) {
+            combo.setDailyLimit(request.getDailyLimit());
+        }
+
+        log.info("[COMBO_UPDATE] Комбо {} обновлено", comboId);
+        return comboRepository.save(combo);
+    }
+
+    /**
+     * Удалить комбо по ID (soft delete по умолчанию).
      */
     @Transactional
     public void deleteCombo(Long comboId) {
-        if (!comboRepository.existsById(comboId)) {
-            throw new ResourceNotFoundException(
-                    "Комбо с ID " + comboId + " не найдено");
-        }
-        comboRepository.deleteById(comboId);
-        log.info("[COMBO_DELETED] Комбо {} удалено", comboId);
+        hideCombo(comboId);
     }
 }

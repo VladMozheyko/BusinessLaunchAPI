@@ -76,6 +76,27 @@ public class Dish {
     private boolean isFreeAddon;
 
     /**
+     * Активно ли блюдо (мягкое удаление).
+     */
+    @Column(name = "active")
+    @Builder.Default
+    private Boolean active = true;
+
+    /**
+     * Скрыто ли блюдо (не отображается в списке, но не удаляется).
+     */
+    @Column(name = "hidden")
+    @Builder.Default
+    private Boolean hidden = false;
+
+    /**
+     * Тип блюда: MAIN (основное) или ADDON (дополнение).
+     */
+    @Column(name = "dish_type", length = 10)
+    @Builder.Default
+    private String dishType = "MAIN";
+
+    /**
      * Время создания блюда (UTC).
      */
     @Column(name = "created_at", updatable = false)

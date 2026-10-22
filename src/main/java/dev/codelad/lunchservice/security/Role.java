@@ -12,10 +12,9 @@ import lombok.Getter;
 public enum Role {
 
     ROLE_GLOBAL_ADMIN("ROLE_GLOBAL_ADMIN"),
-    ROLE_FRANCHISE_OWNER("ROLE_FRANCHISE_OWNER"),
-    ROLE_LOCATION_ADMIN("ROLE_LOCATION_ADMIN"),
-    ROLE_USER("ROLE_USER"),
-    ROLE_GUEST("ROLE_GUEST");
+    ROLE_BAR_OWNER("ROLE_BAR_OWNER"),
+    ROLE_BREW_OWNER("ROLE_BREW_OWNER"),
+    ROLE_USER("ROLE_USER");
 
     private final String authority;
 
@@ -34,7 +33,7 @@ public enum Role {
      * Примеры:
      * <ul>
      *   <li>{@code ROLE_GLOBAL_ADMIN} → {@code GLOBAL_ADMIN}</li>
-     *   <li>{@code ROLE_FRANCHISE_OWNER} → {@code FRANCHISE_OWNER}</li>
+     *   <li>{@code ROLE_BAR_OWNER} → {@code BAR_OWNER}</li>
      *   <li>{@code ROLE_USER} → {@code USER}</li>
      * </ul>
      *

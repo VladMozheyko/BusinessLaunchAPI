@@ -4,11 +4,15 @@ import dev.codelad.lunchservice.constant.Messages;
 import dev.codelad.lunchservice.dto.request.CreateComboBookingRequest;
 import dev.codelad.lunchservice.entity.*;
 import dev.codelad.lunchservice.enums.ComboBookingStatus;
+import dev.codelad.lunchservice.enums.NotificationEventType;
 import dev.codelad.lunchservice.exception.BookingConflictException;
 import dev.codelad.lunchservice.exception.ResourceNotFoundException;
+import dev.codelad.lunchservice.exception.ValidationException;
+import dev.codelad.lunchservice.listener.NotificationEventPublisher;
 import dev.codelad.lunchservice.repository.ComboBookingRepository;
 import dev.codelad.lunchservice.repository.ComboRepository;
 import dev.codelad.lunchservice.repository.DishRepository;
+import dev.codelad.lunchservice.repository.UserRepository;
 import dev.codelad.lunchservice.repository.VenueProfileRepository;
 import dev.codelad.lunchservice.repository.VenueScheduleRepository;
 import dev.codelad.lunchservice.security.SecurityContextHelper;
@@ -21,7 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Сервис для управления бронированиями комбо-наборов.
@@ -37,6 +43,8 @@ public class ComboBookingService {
     private final VenueProfileRepository venueProfileRepository;
     private final VenueScheduleRepository venueScheduleRepository;
     private final SecurityContextHelper securityContextHelper;
+    private final NotificationEventPublisher notificationEventPublisher;
+    private final UserRepository userRepository;
 
     /**
      * Создать бронирование комбо-набора.
@@ -68,6 +76,9 @@ public class ComboBookingService {
         ComboBooking saved = comboBookingRepository.save(booking);
         log.info("[COMBO_BOOKING_CREATED] Бронирование {} создано: venue={}, time={}, guests={}",
                 saved.getId(), request.getVenueId(), request.getTime(), totalGuests);
+
+        // Отправляем push-уведомление пользователю
+        sendComboBookingCreatedNotification(saved, request.getVenueId());
 
         return saved;
     }
@@ -264,6 +275,9 @@ public class ComboBookingService {
 
         log.info("[COMBO_BOOKING_CANCELLED] Бронирование {} отменено по коду: {}", cancelled.getId(), cancelCode);
 
+        // Отправляем push-уведомление пользователю
+        sendComboBookingCancelledNotification(cancelled);
+
         return cancelled;
     }
 
@@ -304,6 +318,9 @@ public class ComboBookingService {
         log.info("[COMBO_BOOKING_CANCELLED] Бронирование {} отменено по коду и телефону: {}, phone={}",
                 cancelled.getId(), cancelCode, phoneNumber);
 
+        // Отправляем push-уведомление пользователю
+        sendComboBookingCancelledNotification(cancelled);
+
         return cancelled;
     }
 
@@ -338,10 +355,21 @@ public class ComboBookingService {
         }
 
         booking.setStatus(ComboBookingStatus.APPROVED);
+        // Устанавливаем время истечения: booking.time + 40 минут
+        java.time.LocalDateTime expiredAtDateTime = java.time.LocalDateTime.of(
+                java.time.LocalDate.now(),
+                booking.getTime()
+        ).plusMinutes(40);
+        booking.setExpiredAt(expiredAtDateTime.toInstant(
+                java.time.ZoneOffset.systemDefault().getRules().getOffset(expiredAtDateTime)
+        ));
         ComboBooking approved = comboBookingRepository.save(booking);
 
         log.info("[COMBO_BOOKING_APPROVED] Бронирование {} подтверждено: venue={}, time={}",
                 approved.getId(), approved.getVenueId(), approved.getTime());
+
+        // Отправляем push-уведомление пользователю
+        sendComboBookingApprovedNotification(approved);
 
         return approved;
     }
@@ -371,11 +399,14 @@ public class ComboBookingService {
         log.info("[COMBO_BOOKING_COMPLETED] Бронирование {} выполнено: venue={}, time={}",
                 completed.getId(), completed.getVenueId(), completed.getTime());
 
+        // Отправляем push-уведомление пользователю
+        sendComboBookingCompletedNotification(completed);
+
         return completed;
     }
 
     /**
-     * Отменить бронирование админом.
+     * Отменить бронирование админом (PENDING или APPROVED → CANCELLED).
      */
     @Transactional
     public ComboBooking cancelByAdmin(java.util.UUID bookingId) {
@@ -388,14 +419,9 @@ public class ComboBookingService {
 
         ComboBooking booking = bookingOpt.get();
 
-        if (booking.getStatus() == ComboBookingStatus.CANCELLED) {
+        if (booking.getStatus() != ComboBookingStatus.PENDING && booking.getStatus() != ComboBookingStatus.APPROVED) {
             throw new BookingConflictException(
-                    String.format(Messages.BOOKING_CANCELLED, booking.getId()));
-        }
-
-        if (booking.getStatus() == ComboBookingStatus.COMPLETED) {
-            throw new BookingConflictException(
-                    String.format(Messages.BOOKING_COMPLETED, booking.getId()));
+                    String.format("Бронирование можно отменить только из статусов PENDING или APPROVED. Текущий статус: %s", booking.getStatus()));
         }
 
         booking.setStatus(ComboBookingStatus.CANCELLED);
@@ -403,6 +429,9 @@ public class ComboBookingService {
 
         log.info("[COMBO_BOOKING_CANCELLED_BY_ADMIN] Бронирование {} отменено админом: venue={}, time={}",
                 cancelled.getId(), cancelled.getVenueId(), cancelled.getTime());
+
+        // Отправляем push-уведомление пользователю
+        sendComboBookingCancelledByAdminNotification(cancelled);
 
         return cancelled;
     }
@@ -413,10 +442,175 @@ public class ComboBookingService {
      */
     @Transactional(readOnly = true)
     public List<ComboBooking> getUserBookings() {
-        java.util.UUID currentUserId = securityContextHelper.getCurrentExternalId();
-        List<ComboBooking> bookings = comboBookingRepository.findByUserIdOrderByCreatedAtDesc(currentUserId);
+        String externalIdStr = securityContextHelper.getCurrentExternalId();
+        List<ComboBooking> bookings = comboBookingRepository.findByUserIdOrderByCreatedAtDesc(externalIdStr);
         log.info("[COMBO_USER_BOOKINGS] Получены бронирования для пользователя {}: {} шт.",
-                currentUserId, bookings.size());
+                externalIdStr, bookings.size());
         return bookings;
+    }
+
+    /**
+     * Отметить бронирование как NO_SHOW (неявка).
+     * Только для администраторов.
+     * @param bookingId ID бронирования
+     * @return отмеченное бронирование
+     */
+    @Transactional
+    public ComboBooking markNoShow(java.util.UUID bookingId) {
+        var bookingOpt = comboBookingRepository.findById(bookingId);
+
+        if (bookingOpt.isEmpty()) {
+            throw new ResourceNotFoundException(
+                    String.format(Messages.BOOKING_NOT_FOUND, bookingId));
+        }
+
+        ComboBooking booking = bookingOpt.get();
+
+        if (booking.getStatus() == ComboBookingStatus.COMPLETED || booking.getStatus() == ComboBookingStatus.CANCELLED) {
+            throw new BookingConflictException(
+                    String.format("Нельзя отметить как NO_SHOW бронирование со статусом %s", booking.getStatus()));
+        }
+
+        booking.setStatus(ComboBookingStatus.NO_SHOW);
+
+        // Increment noShowCount для пользователя
+        if (booking.getUserId() != null) {
+            var userOpt = userRepository.findByExternalId(booking.getUserId());
+            if (userOpt.isPresent()) {
+                User user = userOpt.get();
+                user.setNoShowCount((user.getNoShowCount() != null ? user.getNoShowCount() : 0) + 1);
+                userRepository.save(user);
+            }
+        }
+
+        ComboBooking marked = comboBookingRepository.save(booking);
+        log.info("[COMBO_BOOKING_NO_SHOW] Бронирование {} отмечено как неявка", bookingId);
+
+        return marked;
+    }
+
+    // ==================== Методы для отправки уведомлений ====================
+
+    /**
+     * Отправляет уведомление о создании комбо-брони.
+     */
+    private void sendComboBookingCreatedNotification(ComboBooking booking, Long venueId) {
+        try {
+            String userId = securityContextHelper.getCurrentExternalId().toString();
+            
+            Map<String, String> templateData = new HashMap<>();
+            templateData.put("bookingId", booking.getId().toString());
+            templateData.put("time", booking.getTime().toString());
+            templateData.put("guests", String.valueOf(booking.getTotalGuests()));
+
+            notificationEventPublisher.publishComboBookingEvent(
+                    userId,
+                    NotificationEventType.COMBO_BOOKING_CREATED,
+                    "Комбо-бронь создана",
+                    "Ваша бронь комбо-набора создана. Время: " + booking.getTime() + ", гостей: " + booking.getTotalGuests(),
+                    templateData,
+                    null
+            );
+        } catch (Exception e) {
+            log.error("[NOTIFICATION_ERROR] Failed to send combo booking created notification: bookingId={}, error={}",
+                    booking.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Отправляет уведомление об отмене комбо-брони.
+     */
+    private void sendComboBookingCancelledNotification(ComboBooking booking) {
+        try {
+            String userId = securityContextHelper.getCurrentExternalId().toString();
+            
+            Map<String, String> templateData = new HashMap<>();
+            templateData.put("bookingId", booking.getId().toString());
+
+            notificationEventPublisher.publishComboBookingEvent(
+                    userId,
+                    NotificationEventType.COMBO_BOOKING_CANCELLED,
+                    "Комбо-бронь отменена",
+                    "Ваша бронь комбо-набора отменена.",
+                    templateData,
+                    null
+            );
+        } catch (Exception e) {
+            log.error("[NOTIFICATION_ERROR] Failed to send combo booking cancelled notification: bookingId={}, error={}",
+                    booking.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Отправляет уведомление об отмене комбо-брони администратором.
+     */
+    private void sendComboBookingCancelledByAdminNotification(ComboBooking booking) {
+        try {
+            String userId = securityContextHelper.getCurrentExternalId().toString();
+            
+            Map<String, String> templateData = new HashMap<>();
+            templateData.put("bookingId", booking.getId().toString());
+
+            notificationEventPublisher.publishComboBookingEvent(
+                    userId,
+                    NotificationEventType.COMBO_BOOKING_CANCELLED_BY_ADMIN,
+                    "Комбо-бронь отменена админом",
+                    "Ваша бронь комбо-набора отменена администратором.",
+                    templateData,
+                    null
+            );
+        } catch (Exception e) {
+            log.error("[NOTIFICATION_ERROR] Failed to send combo booking cancelled by admin notification: bookingId={}, error={}",
+                    booking.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Отправляет уведомление об одобрении комбо-брони.
+     */
+    private void sendComboBookingApprovedNotification(ComboBooking booking) {
+        try {
+            String userId = securityContextHelper.getCurrentExternalId().toString();
+            
+            Map<String, String> templateData = new HashMap<>();
+            templateData.put("bookingId", booking.getId().toString());
+            templateData.put("time", booking.getTime().toString());
+
+            notificationEventPublisher.publishComboBookingEvent(
+                    userId,
+                    NotificationEventType.COMBO_BOOKING_APPROVED,
+                    "Комбо-бронь одобрена",
+                    "Ваша бронь комбо-набора одобрена. Время: " + booking.getTime(),
+                    templateData,
+                    null
+            );
+        } catch (Exception e) {
+            log.error("[NOTIFICATION_ERROR] Failed to send combo booking approved notification: bookingId={}, error={}",
+                    booking.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Отправляет уведомление о завершении комбо-брони.
+     */
+    private void sendComboBookingCompletedNotification(ComboBooking booking) {
+        try {
+            String userId = securityContextHelper.getCurrentExternalId().toString();
+            
+            Map<String, String> templateData = new HashMap<>();
+            templateData.put("bookingId", booking.getId().toString());
+
+            notificationEventPublisher.publishComboBookingEvent(
+                    userId,
+                    NotificationEventType.COMBO_BOOKING_COMPLETED,
+                    "Комбо-бронь завершена",
+                    "Ваша бронь комбо-набора завершена. Спасибо, что пришли!",
+                    templateData,
+                    null
+            );
+        } catch (Exception e) {
+            log.error("[NOTIFICATION_ERROR] Failed to send combo booking completed notification: bookingId={}, error={}",
+                    booking.getId(), e.getMessage(), e);
+        }
     }
 }

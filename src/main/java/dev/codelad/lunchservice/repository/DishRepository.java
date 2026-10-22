@@ -13,13 +13,19 @@ import java.util.UUID;
 public interface DishRepository extends JpaRepository<Dish, UUID> {
 
     /**
-     * Найти все блюда для категории.
+     * Найти все активные блюда для категории.
      */
-    List<Dish> findByCategoryId(Long categoryId);
+    List<Dish> findByCategoryIdAndActiveTrue(Long categoryId);
 
     /**
-     * Найти все блюда для заведения (через категории).
+     * Найти все активные блюда для заведения (через категории).
      */
-    @Query("SELECT d FROM Dish d WHERE d.category.venueId = :venueId")
-    List<Dish> findByVenueId(@Param("venueId") Long venueId);
+    @Query("SELECT d FROM Dish d WHERE d.category.venueId = :venueId AND d.active = true")
+    List<Dish> findByVenueIdActive(@Param("venueId") Long venueId);
+
+    /**
+     * Найти все активные блюда для категории (с фильтром по active).
+     */
+    @Query("SELECT d FROM Dish d WHERE d.category.id = :categoryId AND d.active = true")
+    List<Dish> findByCategoryIdActive(@Param("categoryId") Long categoryId);
 }

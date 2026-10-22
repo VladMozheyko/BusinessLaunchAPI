@@ -32,7 +32,12 @@ public enum BookingStatus {
     /**
      * Отменён - отменён пользователем или админом.
      */
-    CANCELLED("CANCELLED");
+    CANCELLED("CANCELLED"),
+
+    /**
+     * Не явился - пользователь не забрал заказ и не отменил бронирование.
+     */
+    NO_SHOW("NO_SHOW");
 
     private final String value;
 

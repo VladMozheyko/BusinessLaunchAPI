@@ -9,42 +9,14 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Утилита для получения информации о текущем аутентифицированном пользователе.
- * Используется в контроллерах и сервисах вместо прямого обращения к SecurityContext.
- * <p>
- * <b>Возможности:</b>
- * <ul>
- *   <li>Получение AuthenticatedUser из SecurityContext</li>
- *   <li>Получение ID пользователя (внутренний и externalId)</li>
- *   <li>Получение email и роли текущего пользователя</li>
- *   <li>Проверка ролей: isAdmin(), isFranchiseOwner(), isLocationAdmin()</li>
- * </ul>
- * <p>
- * <b>Пример использования:</b>
- * <pre>
- * {@code @Autowired}
- * private SecurityContextHelper securityContextHelper;
- *
- * // Получить email
- * String email = securityContextHelper.getCurrentUserEmail();
- *
- * // Проверить роль
- * if (securityContextHelper.isFranchiseOwner()) {
- *     // Логика для франчайзи
- * }
- * </pre>
- *
- * @see AuthenticatedUser
- * @see Role
+ * Утилита для получения информации о текущем пользователе из SecurityContext.
  */
 @Service
 @RequiredArgsConstructor
 public class SecurityContextHelper {
 
     /**
-     * Получить текущего аутентифицированного пользователя.
-     *
-     * @return AuthenticatedUser, если пользователь аутентифицирован, иначе null
+     * Получить текущего пользователя (lenient — возвращает null если не аутентифицирован).
      */
     public AuthenticatedUser getAuthenticatedUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -55,9 +27,7 @@ public class SecurityContextHelper {
     }
 
     /**
-     * Получить внутренний ID пользователя из БД.
-     *
-     * @return UUID пользователя, если аутентифицирован, иначе null
+     * Получить внутренний ID пользователя (null для Bar Auth).
      */
     public UUID getCurrentUserId() {
         AuthenticatedUser user = getAuthenticatedUser();
@@ -65,19 +35,16 @@ public class SecurityContextHelper {
     }
 
     /**
-     * Получить externalId (userUuid из JWT).
-     *
-     * @return externalId пользователя, если аутентифицирован, иначе null
+     * Получить externalId пользователя (userUuid из Base Auth или user_id из Bar Auth).
+     * Возвращается как String для поддержки UUID (550e8400-...) и числовых ID (1001, 2001).
      */
-    public UUID getCurrentExternalId() {
+    public String getCurrentExternalId() {
         AuthenticatedUser user = getAuthenticatedUser();
         return user != null ? user.getExternalId() : null;
     }
 
     /**
      * Получить email текущего пользователя.
-     *
-     * @return email пользователя, если аутентифицирован, иначе null
      */
     public String getCurrentUserEmail() {
         AuthenticatedUser user = getAuthenticatedUser();
@@ -85,9 +52,7 @@ public class SecurityContextHelper {
     }
 
     /**
-     * Получить роль текущего пользователя из БД.
-     *
-     * @return Role пользователя, если аутентифицирован, иначе null
+     * Получить роль текущего пользователя.
      */
     public Role getCurrentUserRole() {
         AuthenticatedUser user = getAuthenticatedUser();
@@ -95,75 +60,55 @@ public class SecurityContextHelper {
     }
 
     /**
-     * Проверить, имеет ли пользователь указанную роль.
-     *
-     * @param role роль для проверки
-     * @return true, если пользователь имеет указанную роль
+     * Проверить, есть ли у текущего пользователя указанная роль.
      */
     public boolean hasRole(Role role) {
         AuthenticatedUser user = getAuthenticatedUser();
-        if (user == null) {
-            return false;
-        }
+        if (user == null) return false;
         return user.getAuthorities().stream()
                 .anyMatch(a -> Objects.equals(a.getAuthority(), role.getAuthority()));
     }
 
     /**
-     * Проверить, является ли пользователь глобальным админом.
-     *
-     * @return true, если роль GLOBAL_ADMIN
+     * Проверить, является ли пользователь глобальным администратором.
      */
     public boolean isAdmin() {
         return hasRole(Role.ROLE_GLOBAL_ADMIN);
     }
 
     /**
-     * Проверить, является ли пользователь владельцем франшизы.
-     *
-     * @return true, если роль FRANCHISE_OWNER
+     * Проверить, является ли пользователь владельцем бара.
      */
-    public boolean isFranchiseOwner() {
-        return hasRole(Role.ROLE_FRANCHISE_OWNER);
+    public boolean isBarOwner() {
+        return hasRole(Role.ROLE_BAR_OWNER);
     }
 
     /**
-     * Проверить, является ли пользователь администратором локации.
-     *
-     * @return true, если роль LOCATION_ADMIN
+     * Проверить, является ли пользователь владельцем пивоварни.
      */
-    public boolean isLocationAdmin() {
-        return hasRole(Role.ROLE_LOCATION_ADMIN);
+    public boolean isBrewOwner() {
+        return hasRole(Role.ROLE_BREW_OWNER);
     }
 
     /**
-     * Получить текущего аутентифицированного пользователя.
-     * Альтернативное название для getAuthenticatedUser().
-     *
-     * @return AuthenticatedUser, если пользователь аутентифицирован, иначе null
-     * @throws IllegalStateException если пользователь не аутентифицирован
+     * Проверить, является ли пользователь владельцем (бар или пивоварня).
+     */
+    public boolean isOwner() {
+        return isBarOwner() || isBrewOwner();
+    }
+
+    /**
+     * Получить текущего пользователя (strict — выбрасывает исключение если не аутентифицирован).
      */
     public AuthenticatedUser getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new IllegalStateException("Пользователь не аутентифицирован");
         }
-
         Object principal = authentication.getPrincipal();
         if (principal instanceof AuthenticatedUser user) {
             return user;
         }
-
         throw new IllegalStateException("Не удалось получить текущего пользователя");
-    }
-
-    /**
-     * Получить ID текущего пользователя (externalId из Auth-сервиса).
-     *
-     * @return externalId пользователя
-     * @throws IllegalStateException если пользователь не аутентифицирован
-     */
-    public UUID getCurrentUserExternalIdStrict() {
-        return getCurrentUser().getUserId();
     }
 }

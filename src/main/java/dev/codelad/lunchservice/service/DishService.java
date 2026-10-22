@@ -47,13 +47,15 @@ public class DishService {
                 .isAvailable(request.getIsAvailable() != null && request.getIsAvailable())
                 .quantity(request.getQuantity())
                 .isFreeAddon(request.getIsFreeAddon() != null && request.getIsFreeAddon())
+                .active(true)
+                .dishType(request.getDishType() != null ? request.getDishType() : "MAIN")
                 .build();
 
         return dishRepository.save(dish);
     }
 
     /**
-     * Получить все блюда для категории.
+     * Получить все активные блюда для категории.
      */
     @Transactional(readOnly = true)
     public List<DishResponse> findByCategoryId(Long categoryId) {
@@ -62,18 +64,18 @@ public class DishService {
                     "Категория с ID " + categoryId + " не найдена");
         }
 
-        List<Dish> dishes = dishRepository.findByCategoryId(categoryId);
+        List<Dish> dishes = dishRepository.findByCategoryIdActive(categoryId);
         return dishes.stream()
                 .map(DishResponse::from)
                 .toList();
     }
 
     /**
-     * Получить все блюда для заведения (через категории).
+     * Получить все активные блюда для заведения (через категории).
      */
     @Transactional(readOnly = true)
     public List<DishResponse> findByVenueId(Long venueId) {
-        List<Dish> dishes = dishRepository.findByVenueId(venueId);
+        List<Dish> dishes = dishRepository.findByVenueIdActive(venueId);
         return dishes.stream()
                 .map(DishResponse::from)
                 .toList();
@@ -85,8 +87,19 @@ public class DishService {
                 .orElseThrow(() -> new DishNotFoundException(
                         noIdMessage(dishId)));
 
-        // Проверяем, есть ли активные заказы с этим блюдом
-        if (lunchBookingRepository.existsByDishIdAndActiveOrders(dishId)) {
+        boolean hasActiveOrders = lunchBookingRepository.existsByDishIdAndActiveOrders(dishId);
+
+        // Проверка изменения dishType при активных заказах
+        if (request.getDishType() != null && !request.getDishType().equals(dish.getDishType())) {
+            if (hasActiveOrders) {
+                throw new ValidationException(
+                        "Нельзя изменить тип блюда: есть активные бронирования. " +
+                        "Сначала завершите заказы или установите блюдо неактивным.");
+            }
+            dish.setDishType(request.getDishType());
+        }
+
+        if (hasActiveOrders) {
             throw new ValidationException(
                     "Нельзя изменить блюдо: есть активные бронирования. " +
                     "Доступно только изменение статуса (доступен/недоступен)." +
@@ -140,15 +153,46 @@ public class DishService {
         return dishRepository.save(dish);
     }
 
+    /**
+     * Скрыть блюдо (мягкое удаление).
+     */
     @Transactional
-    public void deleteDish(UUID dishId) {
-        if (!dishRepository.existsById(dishId)) {
-            throw new DishNotFoundException(
-                    noIdMessage(dishId));
+    public void hideDish(UUID dishId) {
+        Dish dish = dishRepository.findById(dishId)
+                .orElseThrow(() -> new DishNotFoundException(
+                        noIdMessage(dishId)));
+
+        dish.setActive(false);
+        dishRepository.save(dish);
+        log.info("[DISH_HIDDEN] Блюдо {} скрыто", dishId);
+    }
+
+    /**
+     * Физическое удаление блюда (только GLOBAL_ADMIN).
+     */
+    @Transactional
+    public void hardDeleteDish(UUID dishId) {
+        Dish dish = dishRepository.findById(dishId)
+                .orElseThrow(() -> new DishNotFoundException(
+                        noIdMessage(dishId)));
+
+        if (!dish.getActive()) {
+            throw new ValidationException(
+                    "Нельзя физически удалить скрытое блюдо. Используйте soft delete.");
         }
 
-        dishRepository.deleteById(dishId);
-        log.info("[DISH_DELETED] Блюдо {} удалено", dishId);
+        if (lunchBookingRepository.existsByDishIdAndActiveOrders(dishId)) {
+            throw new ValidationException(
+                    "Нельзя физически удалить блюдо с активными заказами.");
+        }
+
+        dishRepository.delete(dish);
+        log.info("[DISH_HARD_DELETED] Блюдо {} физически удалено", dishId);
+    }
+
+    @Transactional
+    public void deleteDish(UUID dishId) {
+        hideDish(dishId);
     }
 
     private static String noIdMessage(UUID dishId) {

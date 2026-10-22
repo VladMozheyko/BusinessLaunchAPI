@@ -39,10 +39,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * <table border="1">
  * <tr><th>Email</th><th>Роль</th><th>Описание</th></tr>
  * <tr><td>admin@company.com</td><td>ROLE_GLOBAL_ADMIN</td><td>Глобальный администратор</td></tr>
- * <tr><td>franchise@company.com</td><td>ROLE_FRANCHISE_OWNER</td><td>Владелец франшизы</td></tr>
- * <tr><td>location@company.com</td><td>ROLE_LOCATION_ADMIN</td><td>Администратор локации</td></tr>
+ * <tr><td>bar@company.com</td><td>ROLE_BAR_OWNER</td><td>Владелец бара</td></tr>
+ * <tr><td>brew@company.com</td><td>ROLE_BREW_OWNER</td><td>Владелец пивоварни</td></tr>
  * <tr><td>user@company.com</td><td>ROLE_USER</td><td>Обычный пользователь</td></tr>
- * <tr><td>guest@company.com</td><td>ROLE_GUEST</td><td>Гость</td></tr>
  * </table>
  * 
  * <h3>Использование:</h3>
@@ -74,14 +73,12 @@ public class AuthController {
 
     /**
      * Список тестовых пользователей с их ролями.
-     * Каждый email соответствует определённой роли.
      */
     private static final Set<String> TEST_USERS = Set.of(
             "admin@company.com",
-            "franchise@company.com",
-            "location@company.com",
-            "user@company.com",
-            "guest@company.com"
+            "bar@company.com",
+            "brew@company.com",
+            "user@company.com"
     );
 
     /**
@@ -97,10 +94,9 @@ public class AuthController {
     private static Role getRoleByEmail(String email) {
         return switch (email) {
             case "admin@company.com" -> Role.ROLE_GLOBAL_ADMIN;
-            case "franchise@company.com" -> Role.ROLE_FRANCHISE_OWNER;
-            case "location@company.com" -> Role.ROLE_LOCATION_ADMIN;
+            case "bar@company.com" -> Role.ROLE_BAR_OWNER;
+            case "brew@company.com" -> Role.ROLE_BREW_OWNER;
             case "user@company.com" -> Role.ROLE_USER;
-            case "guest@company.com" -> Role.ROLE_GUEST;
             default -> Role.ROLE_USER;
         };
     }
@@ -123,10 +119,9 @@ public class AuthController {
                     "<br><br>" +
                     "<b>Доступные тестовые email:</b><br>" +
                     "• admin@company.com → ROLE_GLOBAL_ADMIN<br>" +
-                    "• franchise@company.com → ROLE_FRANCHISE_OWNER<br>" +
-                    "• location@company.com → ROLE_LOCATION_ADMIN<br>" +
-                    "• user@company.com → ROLE_USER<br>" +
-                    "• guest@company.com → ROLE_GUEST",
+                    "• bar@company.com → ROLE_BAR_OWNER<br>" +
+                    "• brew@company.com → ROLE_BREW_OWNER<br>" +
+                    "• user@company.com → ROLE_USER",
             tags = {ApiTags.AUTH}
     )
     @ApiResponse(responseCode = "200", description = "JWT-токен успешно сгенерирован (действует 15 минут)")
@@ -135,8 +130,7 @@ public class AuthController {
     public ResponseEntity<AuthResponse> authenticate(
             @Parameter(
                     description = "Email тестового пользователя. " +
-                            "Доступные email: admin@company.com, franchise@company.com, location@company.com, " +
-                            "user@company.com, guest@company.com",
+                            "Доступные email: admin@company.com, bar@company.com, brew@company.com, user@company.com",
                     required = true
             )
             @Valid @RequestBody AuthRequest request) {

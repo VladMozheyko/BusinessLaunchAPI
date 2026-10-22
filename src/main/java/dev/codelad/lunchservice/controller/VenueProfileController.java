@@ -3,6 +3,7 @@ package dev.codelad.lunchservice.controller;
 import dev.codelad.lunchservice.config.swagger.ApiTags;
 import dev.codelad.lunchservice.dto.request.VenueProfileRequest;
 import dev.codelad.lunchservice.dto.response.VenueProfileResponse;
+import dev.codelad.lunchservice.security.PermissionService;
 import dev.codelad.lunchservice.security.Role;
 import dev.codelad.lunchservice.security.SecurityContextHelper;
 import dev.codelad.lunchservice.service.VenueProfileService;
@@ -14,7 +15,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -38,6 +38,7 @@ public class VenueProfileController {
 
     private final VenueProfileService venueProfileService;
     private final SecurityContextHelper securityContextHelper;
+    private final PermissionService permissionService;
 
     @PostMapping
     @Operation(
@@ -48,21 +49,14 @@ public class VenueProfileController {
     )
     @ApiResponse(responseCode = "200", description = "Карточка создана или обновлена")
     @ApiResponse(responseCode = "400", description = "Ошибка валидации данных")
-    @PreAuthorize("hasRole('FRANCHISE_OWNER')")
     public ResponseEntity<VenueProfileResponse> createOrUpdate(
             @Parameter(description = "Данные карточки заведения", required = true)
             @Valid @RequestBody VenueProfileRequest request) {
-        UUID franchiseUserId = securityContextHelper.getCurrentUserId();
-        String email = securityContextHelper.getCurrentUserEmail();
-        Role role = securityContextHelper.getCurrentUserRole();
+        permissionService.checkOwnerAccess();
+        String externalIdStr = securityContextHelper.getCurrentExternalId();
 
-        // Дополнительная проверка: пользователь должен быть FRANCHISE_OWNER
-        if (!securityContextHelper.isFranchiseOwner()) {
-            throw new IllegalStateException("Только FRANCHISE_OWNER может создавать/обновлять карточки заведений");
-        }
-
-        log.info("[VENUE] Создание/обновление карточки пользователем: email={}, role={}", email, role);
-        return ResponseEntity.ok(venueProfileService.createOrUpdate(franchiseUserId, request));
+        log.info("[VENUE] Создание/обновление карточки пользователем: externalId={}", externalIdStr);
+        return ResponseEntity.ok(venueProfileService.createOrUpdate(externalIdStr, request));
     }
 
     @GetMapping("/my")
@@ -74,19 +68,12 @@ public class VenueProfileController {
     )
     @ApiResponse(responseCode = "200", description = "Карточка найдена")
     @ApiResponse(responseCode = "404", description = "Карточка не найдена")
-    @PreAuthorize("hasAuthority('ROLE_FRANCHISE_OWNER')")
     public ResponseEntity<VenueProfileResponse> getMyVenue() {
-        UUID franchiseUserId = securityContextHelper.getCurrentUserId();
-        String email = securityContextHelper.getCurrentUserEmail();
-        Role role = securityContextHelper.getCurrentUserRole();
+        permissionService.checkOwnerAccess();
+        String externalIdStr = securityContextHelper.getCurrentExternalId();
 
-        // Дополнительная проверка: пользователь должен быть FRANCHISE_OWNER
-        if (!securityContextHelper.isFranchiseOwner()) {
-            throw new IllegalStateException("Только FRANCHISE_OWNER может просматривать карточку заведения");
-        }
-
-        log.info("[VENUE] Просмотр карточки заведения пользователем: email={}, role={}", email, role);
-        return ResponseEntity.ok(venueProfileService.getByFranchiseUserId(franchiseUserId));
+        log.info("[VENUE] Просмотр карточки заведения пользователем: externalId={}", externalIdStr);
+        return ResponseEntity.ok(venueProfileService.getByOwnerUserId(externalIdStr));
     }
 
     @GetMapping("/{id}")
@@ -98,8 +85,8 @@ public class VenueProfileController {
     )
     @ApiResponse(responseCode = "200", description = "Карточка найдена")
     @ApiResponse(responseCode = "404", description = "Карточка не найдена")
-    @PreAuthorize("hasAuthority('ROLE_GLOBAL_ADMIN')")
     public ResponseEntity<VenueProfileResponse> getVenueById(@PathVariable Long id) {
+        permissionService.checkGlobalAdminAccess();
         String email = securityContextHelper.getCurrentUserEmail();
         Role role = securityContextHelper.getCurrentUserRole();
 
@@ -118,10 +105,10 @@ public class VenueProfileController {
     )
     @ApiResponse(responseCode = "204", description = "Карточка удалена")
     @ApiResponse(responseCode = "404", description = "Карточка не найдена")
-    @PreAuthorize("hasAnyAuthority('ROLE_GLOBAL_ADMIN', 'ROLE_FRANCHISE_OWNER')")
     public ResponseEntity<Void> deleteVenueProfile(
             @Parameter(description = "ID карточки заведения", required = true)
             @PathVariable Long id) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
         venueProfileService.delete(id);
         return ResponseEntity.noContent().build();
     }

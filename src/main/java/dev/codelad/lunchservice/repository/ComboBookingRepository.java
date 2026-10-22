@@ -31,7 +31,7 @@ public interface ComboBookingRepository extends JpaRepository<ComboBooking, UUID
     /**
      * Найти все бронирования пользователя по external user ID.
      */
-    List<ComboBooking> findByUserIdOrderByCreatedAtDesc(java.util.UUID userId);
+    List<ComboBooking> findByUserIdOrderByCreatedAtDesc(String userId);
 
     /**
      * Подсчитать сумму гостей в активных бронированиях на дату и время.
@@ -59,4 +59,10 @@ public interface ComboBookingRepository extends JpaRepository<ComboBooking, UUID
                                        @Param("statuses") List<ComboBookingStatus> statuses,
                                        @Param("startDate") LocalDate startDate,
                                        @Param("endDate") LocalDate endDate);
+
+    /**
+     * Найти все просроченные APPROVED бронирования для scheduled task.
+     */
+    @Query("SELECT b FROM ComboBooking b WHERE b.status = 'APPROVED' AND b.expiredAt < :now")
+    List<ComboBooking> findExpiredApprovedBookings(@Param("now") java.time.Instant now);
 }

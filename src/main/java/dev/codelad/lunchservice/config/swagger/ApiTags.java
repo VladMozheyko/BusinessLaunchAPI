@@ -41,6 +41,12 @@ public final class ApiTags {
     /** Карточки заведений — управление карточками бизнес-ланчей */
     public static final String VENUE_PROFILES = "📁 Карточки заведений";
 
+    /** Устройства — управление регистрацией и привязкой устройств */
+    public static final String DEVICES = "📱 Устройства ";
+
+    /** Настройки — управление настройками уведомлений пользователя */
+    public static final String PREFERENCES = "⚙️ Настройки уведомлений";
+
     /** Аутентификация — получение JWT-токенов (только Dev/Local) */
     public static final String AUTH = "🔐 Аутентификация";
 
@@ -66,8 +72,9 @@ public final class ApiTags {
     public static final String DISHES_DESC = "API для управления блюдами (создание, обновление, изменение доступности, удаление)";
     public static final String COMBOS_DESC = "API для управления комбо-наборами (создание, изменение активности)";
     public static final String LUNCH_BOOKINGS_DESC = "API для бронирования бизнес-ланчей (создание бронирования)";
-    public static final String ONBOARDING_DESC = "API для управления заявками на присоединение к системе (создание, рассмотрение, одобрение, отклонение, назначение LOCATION_ADMIN)";
     public static final String VENUE_PROFILES_DESC = "API для управления карточками заведений (создание, обновление, расписание, логотип)";
+    public static final String DEVICES_DESC = "API для регистрации и управления устройствами пользователей";
+    public static final String PREFERENCES_DESC = "API для управления настройками уведомлений";
     /** Suppress: это описание API, а не реальный секрет. */
     @SuppressWarnings("squid:S2068")
     public static final String AUTH_DESC = "API для аутентификации и получения JWT-токенов (ТОЛЬКО для Dev/Local профилей)";

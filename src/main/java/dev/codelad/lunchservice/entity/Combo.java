@@ -45,6 +45,13 @@ public class Combo {
     private Integer dailyLimit;
 
     /**
+     * Скрыт ли комбо (мягкое удаление).
+     */
+    @Column(name = "hidden")
+    @Builder.Default
+    private Boolean hidden = false;
+
+    /**
      * Категории, включённые в комбо.
      * Пользователь выбирает по одному блюду из каждой категории.
      */

@@ -21,21 +21,19 @@ import java.util.UUID;
 public class VenueProfileResponse {
 
     private Long id;
-    private UUID franchiseUserId;
+    private UUID ownerUserId;
     private String name;
     private String description;
     private String logoUrl;
-    private Boolean active;
     private List<ScheduleResponse> schedules;
 
     public static VenueProfileResponse from(VenueProfile profile, List<VenueSchedule> schedules) {
         return VenueProfileResponse.builder()
                 .id(profile.getId())
-                .franchiseUserId(profile.getFranchiseUserId())
+                .ownerUserId(profile.getOwnerUserId())
                 .name(profile.getName())
                 .description(profile.getDescription())
                 .logoUrl(profile.getLogoUrl())
-                .active(profile.getActive())
                 .schedules(schedules.stream()
                         .map(ScheduleResponse::from)
                         .toList())

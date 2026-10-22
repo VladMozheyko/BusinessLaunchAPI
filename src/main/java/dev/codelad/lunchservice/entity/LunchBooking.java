@@ -4,9 +4,6 @@ import dev.codelad.lunchservice.enums.BookingStatus;
 import dev.codelad.lunchservice.util.CancelCodeGenerator;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.annotations.UuidGenerator;
-import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.time.LocalTime;
@@ -28,17 +25,16 @@ import java.util.UUID;
 public class LunchBooking {
 
     @Id
-    @UuidGenerator
-    @JdbcTypeCode(SqlTypes.BINARY)
+    @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(updatable = false, nullable = false)
     private UUID id;
 
     /**
      * ID пользователя, который создал бронирование (externalId из Auth-сервиса).
+     * Хранится как String для поддержки UUID и числовых ID.
      */
     @Column(name = "user_id", nullable = false)
-    @JdbcTypeCode(SqlTypes.BINARY)
-    private java.util.UUID userId;
+    private String userId;
 
     /**
      * Заведение, к которому привязано бронирование.
@@ -83,6 +79,26 @@ public class LunchBooking {
     @Column(name = "total_guests", nullable = false)
     @Builder.Default
     private Integer totalGuests = 0;
+
+    /**
+     * Время, после которого бронь считается просроченной (устанавливается при APPROVED).
+     * booking.time + 40 минут.
+     */
+    @Column(name = "expired_at")
+    private Instant expiredAt;
+
+    /**
+     * Количество неявок (snapshot при создании бронирования).
+     */
+    @Column(name = "no_show_count")
+    @Builder.Default
+    private Integer noShowCount = 0;
+
+    /**
+     * Номер телефона для guests (snapshot no-show phone).
+     */
+    @Column(name = "no_show_phone", length = 20)
+    private String noShowPhone;
 
     /**
      * Позиции заказа.

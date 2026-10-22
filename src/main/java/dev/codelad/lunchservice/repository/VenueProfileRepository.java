@@ -11,9 +11,7 @@ import java.util.UUID;
 @Repository
 public interface VenueProfileRepository extends JpaRepository<VenueProfile, Long> {
 
-    List<VenueProfile> findByFranchiseUserId(UUID franchiseUserId);
+    List<VenueProfile> findByExternalId(String externalId);
 
-    Optional<VenueProfile> findByFranchiseUserIdAndActiveIsTrue(UUID franchiseUserId);
-
-    boolean existsByFranchiseUserId(UUID franchiseUserId);
+    Optional<VenueProfile> findByVenueId(Long venueId);
 }

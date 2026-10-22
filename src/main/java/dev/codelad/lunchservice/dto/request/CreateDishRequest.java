@@ -47,4 +47,7 @@ public class CreateDishRequest {
 
     @Schema(description = "Количество доступных блюд (необязательно). null — не ограничено, 0 — ни одного, >0 — ограниченное количество", example = "100")
     private Integer quantity;
+
+    @Schema(description = "Тип блюда: MAIN (основное) или ADDON (дополнение). По умолчанию MAIN", example = "MAIN")
+    private String dishType = "MAIN";
 }

@@ -7,6 +7,7 @@ import dev.codelad.lunchservice.dto.request.UpdateDishRequest;
 import dev.codelad.lunchservice.dto.request.UpdateFreeAddonRequest;
 import dev.codelad.lunchservice.dto.response.DishResponse;
 import dev.codelad.lunchservice.entity.Dish;
+import dev.codelad.lunchservice.security.PermissionService;
 import dev.codelad.lunchservice.service.DishService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -16,7 +17,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -41,6 +41,7 @@ import java.util.UUID;
 public class DishController {
 
     private final DishService dishService;
+    private final PermissionService permissionService;
 
     @PostMapping("/dish")
     @Operation(
@@ -51,10 +52,10 @@ public class DishController {
     @ApiResponse(responseCode = "201", description = "Блюдо успешно создано")
     @ApiResponse(responseCode = "400", description = "Ошибка валидации данных")
     @ApiResponse(responseCode = "404", description = "Категория не найдена")
-    @PreAuthorize("hasAnyAuthority('ROLE_GLOBAL_ADMIN', 'ROLE_FRANCHISE_OWNER', 'ROLE_LOCATION_ADMIN')")
     public ResponseEntity<DishResponse> createDish(
             @Parameter(description = "Данные для создания блюда", required = true)
             @Valid @RequestBody CreateDishRequest request) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
         Dish dish = dishService.createDish(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(DishResponse.from(dish));
     }
@@ -66,10 +67,10 @@ public class DishController {
             tags = {ApiTags.DISHES, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
     )
     @ApiResponse(responseCode = "200", description = "Список блюд")
-    @PreAuthorize("hasAnyAuthority('ROLE_GLOBAL_ADMIN', 'ROLE_FRANCHISE_OWNER', 'ROLE_LOCATION_ADMIN')")
     public List<DishResponse> findByCategoryId(
             @Parameter(description = "ID категории", required = true)
             @RequestParam Long categoryId) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
         return dishService.findByCategoryId(categoryId);
     }
 
@@ -80,10 +81,10 @@ public class DishController {
             tags = {ApiTags.DISHES, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
     )
     @ApiResponse(responseCode = "200", description = "Список блюд")
-    @PreAuthorize("hasAnyAuthority('ROLE_GLOBAL_ADMIN', 'ROLE_FRANCHISE_OWNER', 'ROLE_LOCATION_ADMIN')")
     public List<DishResponse> findMyDishesByVenueId(
             @Parameter(description = "ID заведения", required = true)
             @RequestParam Long venueId) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
         return dishService.findByVenueId(venueId);
     }
 
@@ -95,12 +96,12 @@ public class DishController {
     )
     @ApiResponse(responseCode = "200", description = "Блюдо обновлено")
     @ApiResponse(responseCode = "404", description = "Блюдо не найдено")
-    @PreAuthorize("hasAnyAuthority('ROLE_GLOBAL_ADMIN', 'ROLE_FRANCHISE_OWNER', 'ROLE_LOCATION_ADMIN')")
     public ResponseEntity<DishResponse> updateDish(
             @Parameter(description = "UUID блюда", required = true)
             @PathVariable UUID id,
             @Parameter(description = "Новые значения price/weight/weightUnit", required = true)
             @Valid @RequestBody UpdateDishRequest request) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
         Dish dish = dishService.updateDish(id, request);
         return ResponseEntity.ok(DishResponse.from(dish));
     }
@@ -113,12 +114,12 @@ public class DishController {
     )
     @ApiResponse(responseCode = "200", description = "Доступность обновлена")
     @ApiResponse(responseCode = "404", description = "Блюдо не найдено")
-    @PreAuthorize("hasAnyAuthority('ROLE_GLOBAL_ADMIN', 'ROLE_FRANCHISE_OWNER', 'ROLE_LOCATION_ADMIN')")
     public ResponseEntity<DishResponse> updateAvailability(
             @Parameter(description = "UUID блюда", required = true)
             @PathVariable UUID id,
             @Parameter(description = "Новое значение isAvailable", required = true)
             @Valid @RequestBody UpdateAvailabilityRequest request) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
         Dish dish = dishService.updateAvailability(id, request);
         return ResponseEntity.ok(DishResponse.from(dish));
     }
@@ -131,29 +132,46 @@ public class DishController {
     )
     @ApiResponse(responseCode = "200", description = "Флаг обновлён")
     @ApiResponse(responseCode = "404", description = "Блюдо не найдено")
-    @PreAuthorize("hasAnyAuthority('ROLE_GLOBAL_ADMIN', 'ROLE_FRANCHISE_OWNER', 'ROLE_LOCATION_ADMIN')")
     public ResponseEntity<DishResponse> updateFreeAddon(
             @Parameter(description = "UUID блюда", required = true)
             @PathVariable UUID id,
             @Parameter(description = "Новое значение isFreeAddon", required = true)
             @Valid @RequestBody UpdateFreeAddonRequest request) {
+        permissionService.checkGlobalAdminOrOwnerAccess();
         Dish dish = dishService.updateFreeAddon(id, request);
         return ResponseEntity.ok(DishResponse.from(dish));
     }
 
     @DeleteMapping("/dish/{id}")
     @Operation(
-            summary = "Удаление блюда",
-            description = "Полное удаление блюда из системы.",
+            summary = "Скрыть блюдо (мягкое удаление)",
+            description = "Скрывает блюдо (устанавливает isActive=false). Блюдо больше не отображается в списке.",
             tags = {ApiTags.DISHES, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
     )
-    @ApiResponse(responseCode = "204", description = "Блюдо удалено")
+    @ApiResponse(responseCode = "204", description = "Блюдо скрыто")
     @ApiResponse(responseCode = "404", description = "Блюдо не найдено")
-    @PreAuthorize("hasAnyAuthority('ROLE_GLOBAL_ADMIN', 'ROLE_FRANCHISE_OWNER', 'ROLE_LOCATION_ADMIN')")
-    public ResponseEntity<Void> deleteDish(
+    public ResponseEntity<Void> hideDish(
             @Parameter(description = "UUID блюда", required = true)
             @PathVariable UUID id) {
-        dishService.deleteDish(id);
+        permissionService.checkGlobalAdminOrOwnerAccess();
+        dishService.hideDish(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/dish/{id}/hard")
+    @Operation(
+            summary = "Физическое удаление блюда",
+            description = "Полное физическое удаление блюда. Только для GLOBAL_ADMIN. Нельзя удалить блюдо с активными заказами.",
+            tags = {ApiTags.DISHES, ApiTags.GLOBAL_ADMIN}
+    )
+    @ApiResponse(responseCode = "204", description = "Блюдо физически удалено")
+    @ApiResponse(responseCode = "404", description = "Блюдо не найдено")
+    @ApiResponse(responseCode = "409", description = "Нельзя удалить: есть активные заказы или блюдо скрыто")
+    public ResponseEntity<Void> hardDeleteDish(
+            @Parameter(description = "UUID блюда", required = true)
+            @PathVariable UUID id) {
+        permissionService.checkGlobalAdminAccess();
+        dishService.hardDeleteDish(id);
         return ResponseEntity.noContent().build();
     }
 }

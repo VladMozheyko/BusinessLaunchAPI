@@ -28,4 +28,7 @@ public class UpdateDishRequest {
 
     @Schema(description = "Новое количество доступных блюд (необязательно). null — не ограничено, 0 — ни одного, >0 — ограниченное количество", example = "100")
     private Integer quantity;
+
+    @Schema(description = "Тип блюда: MAIN (основное) или ADDON (дополнение)", example = "MAIN")
+    private String dishType;
 }

@@ -24,7 +24,10 @@ public enum ComboBookingStatus {
     COMPLETED("COMPLETED"),
 
     /** Отменён */
-    CANCELLED("CANCELLED");
+    CANCELLED("CANCELLED"),
+
+    /** Не явился */
+    NO_SHOW("NO_SHOW");
 
     private final String value;
 

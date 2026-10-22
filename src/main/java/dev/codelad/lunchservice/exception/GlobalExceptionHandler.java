@@ -38,6 +38,26 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Обработка AuthenticationRequiredException (401).
+     */
+    @ExceptionHandler(AuthenticationRequiredException.class)
+    public ResponseEntity<ErrorResponse> handleAuthenticationRequired(AuthenticationRequiredException e) {
+        log.warn("[AUTH_REQUIRED] {}", e.getMessage());
+        ErrorResponse body = buildResponse(HttpStatus.UNAUTHORIZED, e.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
+    }
+
+    /**
+     * Обработка ForbiddenAccessException (403).
+     */
+    @ExceptionHandler(ForbiddenAccessException.class)
+    public ResponseEntity<ErrorResponse> handleForbidden(ForbiddenAccessException e) {
+        log.warn("[ACCESS_DENIED] {}", e.getMessage());
+        ErrorResponse body = buildResponse(HttpStatus.FORBIDDEN, e.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
+    /**
      * Обработка ResourceNotFoundException.
      */
     @ExceptionHandler(ResourceNotFoundException.class)
