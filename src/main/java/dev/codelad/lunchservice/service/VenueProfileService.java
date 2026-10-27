@@ -4,15 +4,16 @@ import dev.codelad.lunchservice.dto.request.VenueProfileRequest;
 import dev.codelad.lunchservice.dto.response.VenueProfileResponse;
 import dev.codelad.lunchservice.entity.VenueProfile;
 import dev.codelad.lunchservice.entity.VenueSchedule;
+import dev.codelad.lunchservice.repository.FoodServiceFeignClient;
 import dev.codelad.lunchservice.repository.VenueProfileRepository;
 import dev.codelad.lunchservice.repository.VenueScheduleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Сервис для управления карточками заведений.
@@ -25,14 +26,87 @@ public class VenueProfileService {
 
     private final VenueProfileRepository venueProfileRepository;
     private final VenueScheduleRepository venueScheduleRepository;
+    private final FoodSyncService foodSyncService;
+    private final FoodServiceFeignClient foodServiceFeignClient;
+
+    /**
+     * Получить или создать VenueProfile лениво.
+     * Вызывается при первом запросе к данным заведения.
+     * Создаёт пустой VenueProfile с venueId — пользователь позже заполнит name, description.
+     * 
+     * Если VenueProfile создан впервые — запускает async синхронизацию с Food Service.
+     */
+    @Transactional
+    public VenueProfile getOrCreateVenueProfile(Long venueId) {
+        return venueProfileRepository.findByVenueId(venueId)
+                .orElseGet(() -> {
+                    log.info("[VENUE] Ленивое создание VenueProfile: venueId={}", venueId);
+                    VenueProfile newProfile = VenueProfile.builder()
+                            .venueId(venueId)
+                            .build();
+                    VenueProfile saved = venueProfileRepository.save(newProfile);
+                    
+                    // Запускаем синхронизацию с Food Service (асинхронно)
+                    triggerInitialSync(venueId);
+                    
+                    return saved;
+                });
+    }
+
+    /**
+     * Запустить начальную синхронизацию с Food Service.
+     * Вызывается при создании нового VenueProfile.
+     * Асинхронно — не блокирует ответ пользователю.
+     */
+    @Async("foodSyncExecutor")
+    public void triggerInitialSync(Long venueId) {
+        try {
+            log.info("[INIT_SYNC] Запуск начальной синхронизации для venueId={}", venueId);
+            foodSyncService.syncMenu(venueId, "INIT");
+            log.info("[INIT_SYNC] Завершена для venueId={}", venueId);
+        } catch (Exception e) {
+            log.error("[INIT_SYNC] Ошибка синхронизации для venueId={}: {}", venueId, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Получить или обновить логотип заведения из Food Service.
+     * Вызывается при запросе к VenueProfile (когда пользователь заполняет профиль).
+     * 
+     * @param venueId ID заведения
+     * @return true если логотип успешно подтянут
+     */
+    @Transactional
+    public boolean syncLogoFromFoodService(Long venueId) {
+        return venueProfileRepository.findByVenueId(venueId)
+                .map(profile -> {
+                    try {
+                        // Получаем данные из Food Service
+                        var response = foodServiceFeignClient.getMenu(venueId);
+                        
+                        if (response.getBody() != null && response.getBody().getLogoUrl() != null) {
+                            String logoUrl = response.getBody().getLogoUrl();
+                            
+                            // Используем общий метод из FoodSyncService
+                            foodSyncService.updateLogo(venueId, logoUrl);
+                            return true;
+                        }
+                    } catch (Exception e) {
+                        log.warn("[VENUE_LOGO] Ошибка подтягивания логотипа для venueId={}: {}", venueId, e.getMessage());
+                    }
+                    return false;
+                })
+                .orElse(false);
+    }
 
     /**
      * Создать или обновить карточку заведения.
+     * Ищет по venueId (из Bar Auth JWT: bar_id/brew_id).
      */
     @Transactional
-    public VenueProfileResponse createOrUpdate(String externalIdStr, VenueProfileRequest request) {
-        VenueProfile profile = updateExisting(externalIdStr, request)
-                .orElseGet(() -> createNew(externalIdStr, request));
+    public VenueProfileResponse createOrUpdate(Long venueId, VenueProfileRequest request) {
+        VenueProfile profile = updateExisting(venueId, request)
+                .orElseGet(() -> createNew(venueId, request));
 
         List<VenueSchedule> schedules = venueScheduleRepository.findByVenueProfileIdOrderByDayOfWeekAsc(profile.getId());
         return VenueProfileResponse.from(profile, schedules);
@@ -41,39 +115,28 @@ public class VenueProfileService {
     /**
      * Обновить существующую карточку, если она есть.
      */
-    private java.util.Optional<VenueProfile> updateExisting(
-            String externalIdStr, VenueProfileRequest request) {
-
-        // Ищем по ownerUserId (в новой модели это externalId из Bar Auth JWT)
-        List<VenueProfile> existing = venueProfileRepository.findByExternalId(externalIdStr);
-        if (existing.isEmpty()) {
-            return java.util.Optional.empty();
-        }
-
-        VenueProfile profile = existing.getFirst();
-        updateProfileFields(profile, request);
-        replaceSchedules(profile.getId(), request.getSchedules());
-
-        return java.util.Optional.of(profile);
+    private java.util.Optional<VenueProfile> updateExisting(Long venueId, VenueProfileRequest request) {
+        return venueProfileRepository.findByVenueId(venueId)
+                .map(profile -> {
+                    updateProfileFields(profile, request);
+                    replaceSchedules(profile.getId(), request.getSchedules());
+                    return profile;
+                });
     }
 
     /**
      * Обновить поля карточки.
      */
-    private void updateProfileFields(
-            VenueProfile profile, VenueProfileRequest request) {
+    private void updateProfileFields(VenueProfile profile, VenueProfileRequest request) {
         profile.setName(request.getName());
         profile.setDescription(request.getDescription());
         profile.setLogoUrl(request.getLogoUrl());
-        profile.setVenueId(request.getVenueId());
     }
 
     /**
      * Заменить расписание: удалить старое, сохранить новое.
      */
-    private void replaceSchedules(
-            Long profileId, List<VenueProfileRequest.ScheduleItem> scheduleItems) {
-
+    private void replaceSchedules(Long profileId, List<VenueProfileRequest.ScheduleItem> scheduleItems) {
         venueScheduleRepository.deleteAll(
                 venueScheduleRepository.findByVenueProfileIdOrderByDayOfWeekAsc(profileId));
 
@@ -86,10 +149,9 @@ public class VenueProfileService {
     /**
      * Создать новую карточку заведения.
      */
-    private VenueProfile createNew(String externalIdStr, VenueProfileRequest request) {
+    private VenueProfile createNew(Long venueId, VenueProfileRequest request) {
         VenueProfile profile = VenueProfile.builder()
-                .externalId(externalIdStr)
-                .venueId(request.getVenueId())
+                .venueId(venueId)
                 .name(request.getName())
                 .description(request.getDescription())
                 .logoUrl(request.getLogoUrl())
@@ -101,6 +163,7 @@ public class VenueProfileService {
             saveSchedules(profile, request.getSchedules());
         }
 
+        log.info("[VENUE] Создана новая карточка заведения: venueId={}, profileId={}", venueId, profile.getId());
         return profile;
     }
 
@@ -132,21 +195,7 @@ public class VenueProfileService {
     }
 
     /**
-     * Получить активную карточку заведения по externalId (userUuid или user_id как String).
-     */
-    public VenueProfileResponse getByOwnerUserId(String externalIdStr) {
-        List<VenueProfile> profiles = venueProfileRepository.findByExternalId(externalIdStr);
-        if (profiles.isEmpty()) {
-            throw new RuntimeException("Карточка заведения не найдена для пользователя: " + externalIdStr);
-        }
-        VenueProfile profile = profiles.getFirst();
-
-        List<VenueSchedule> schedules = venueScheduleRepository.findByVenueProfileIdOrderByDayOfWeekAsc(profile.getId());
-        return VenueProfileResponse.from(profile, schedules);
-    }
-
-    /**
-     * Получить карточку заведения по venueId (из Bar Auth JWT).
+     * Получить карточку заведения по venueId (из Bar Auth JWT: bar_id/brew_id).
      */
     public VenueProfileResponse getByVenueId(Long venueId) {
         VenueProfile profile = venueProfileRepository.findByVenueId(venueId)

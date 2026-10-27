@@ -47,7 +47,7 @@ public class DishController {
     @Operation(
             summary = "Создание блюда",
             description = "Создаёт новое блюдо в указанной категории. Проверяет существование категории.",
-            tags = {ApiTags.DISHES, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
+            tags = {ApiTags.DISHES, ApiTags.GLOBAL_ADMIN, ApiTags.BAR_BREW_OWNER, ApiTags.LOCATION_MANAGER}
     )
     @ApiResponse(responseCode = "201", description = "Блюдо успешно создано")
     @ApiResponse(responseCode = "400", description = "Ошибка валидации данных")
@@ -63,8 +63,8 @@ public class DishController {
     @GetMapping("/dish")
     @Operation(
             summary = "Получить все блюда категории",
-            description = "Возвращает все блюда для указанной категории. Доступно для GL, FO и LA.",
-            tags = {ApiTags.DISHES, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
+            description = "Возвращает все блюда для указанной категории. Доступно для GL, BAR/BREW OWNER и LM.",
+            tags = {ApiTags.DISHES, ApiTags.GLOBAL_ADMIN, ApiTags.BAR_BREW_OWNER, ApiTags.LOCATION_MANAGER}
     )
     @ApiResponse(responseCode = "200", description = "Список блюд")
     public List<DishResponse> findByCategoryId(
@@ -77,8 +77,8 @@ public class DishController {
     @GetMapping("/dish/my")
     @Operation(
             summary = "Получить все мои блюда для заведения",
-            description = "Возвращает все блюда для указанного заведения Франчайзи. Доступно для GL, FO и LA.",
-            tags = {ApiTags.DISHES, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
+            description = "Возвращает все блюда для указанного заведения. Доступно для GL, BAR/BREW OWNER и LM.",
+            tags = {ApiTags.DISHES, ApiTags.GLOBAL_ADMIN, ApiTags.BAR_BREW_OWNER, ApiTags.LOCATION_MANAGER}
     )
     @ApiResponse(responseCode = "200", description = "Список блюд")
     public List<DishResponse> findMyDishesByVenueId(
@@ -92,7 +92,7 @@ public class DishController {
     @Operation(
             summary = "Обновление блюда",
             description = "Обновляет price, weight или weightUnit блюда. Можно обновлять только указанные поля.",
-            tags = {ApiTags.DISHES, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
+            tags = {ApiTags.DISHES, ApiTags.GLOBAL_ADMIN, ApiTags.BAR_BREW_OWNER, ApiTags.LOCATION_MANAGER}
     )
     @ApiResponse(responseCode = "200", description = "Блюдо обновлено")
     @ApiResponse(responseCode = "404", description = "Блюдо не найдено")
@@ -109,8 +109,8 @@ public class DishController {
     @PatchMapping("/dish/{id}/availability")
     @Operation(
             summary = "Изменение доступности",
-            description = "Включает или выключает блюдо из меню. Доступно для GL, FO, LA и LE.",
-            tags = {ApiTags.DISHES, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
+            description = "Включает или выключает блюдо из меню. Доступно для GL, BAR/BREW OWNER и LM.",
+            tags = {ApiTags.DISHES, ApiTags.GLOBAL_ADMIN, ApiTags.BAR_BREW_OWNER, ApiTags.LOCATION_MANAGER}
     )
     @ApiResponse(responseCode = "200", description = "Доступность обновлена")
     @ApiResponse(responseCode = "404", description = "Блюдо не найдено")
@@ -128,7 +128,7 @@ public class DishController {
     @Operation(
             summary = "Изменение isFreeAddon",
             description = "Устанавливает или снимает флаг «бесплатное дополнение» (хлеб, компот и т.д.).",
-            tags = {ApiTags.DISHES, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
+            tags = {ApiTags.DISHES, ApiTags.GLOBAL_ADMIN, ApiTags.BAR_BREW_OWNER, ApiTags.LOCATION_MANAGER}
     )
     @ApiResponse(responseCode = "200", description = "Флаг обновлён")
     @ApiResponse(responseCode = "404", description = "Блюдо не найдено")
@@ -146,7 +146,7 @@ public class DishController {
     @Operation(
             summary = "Скрыть блюдо (мягкое удаление)",
             description = "Скрывает блюдо (устанавливает isActive=false). Блюдо больше не отображается в списке.",
-            tags = {ApiTags.DISHES, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
+            tags = {ApiTags.DISHES, ApiTags.GLOBAL_ADMIN, ApiTags.BAR_BREW_OWNER, ApiTags.LOCATION_MANAGER}
     )
     @ApiResponse(responseCode = "204", description = "Блюдо скрыто")
     @ApiResponse(responseCode = "404", description = "Блюдо не найдено")

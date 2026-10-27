@@ -3,6 +3,7 @@ package dev.codelad.lunchservice.controller;
 
 import dev.codelad.lunchservice.config.ProfileUtil;
 import dev.codelad.lunchservice.config.SecurityProperties;
+import dev.codelad.lunchservice.config.swagger.ApiTags;
 import io.jsonwebtoken.Jwts;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -66,7 +67,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @RestController
 @RequestMapping("/api/test-auth")
 @RequiredArgsConstructor
-@Tag(name = "📁⚙️ Test Auth", description = "Тестовая аутентикация для Dev/Local профилей. Эмулирует Auth Service и Bar Auth Service.")
+@Tag(name = ApiTags.AUTH, description = ApiTags.AUTH_DESC)
 public class TestAuthController {
 
     private final SecurityProperties securityProperties;
@@ -111,8 +112,7 @@ public class TestAuthController {
                     "• deviceId (UUID) — ID устройства<br>" +
                     "• sub (String) — email пользователя<br><br>" +
                     "<b>Время жизни токена:</b> 15 минут (900 сек)<br>" +
-                    "<b>Refresh token:</b> 30 дней (2592000 сек)",
-            tags = {"📁⚙️ Test Auth"}
+                    "<b>Refresh token:</b> 30 дней (2592000 сек)"
     )
     @ApiResponse(responseCode = "200", description = "Токены успешно сгенерированы")
     @ApiResponse(responseCode = "503", description = "Недоступно в production")
@@ -204,8 +204,7 @@ public class TestAuthController {
                     "• iss (String) — issuer: admin.center.beer<br>" +
                     "• aud (String) — audience: admin.center.beer.consumer<br><br>" +
                     "<b>Время жизни токена:</b> 15 минут (900 сек)<br>" +
-                    "<b>Refresh token:</b> 30 дней (2592000 сек)",
-            tags = {"📁⚙️ Test Auth"}
+                    "<b>Refresh token:</b> 30 дней (2592000 сек)"
     )
     @ApiResponse(responseCode = "200", description = "Токены успешно сгенерированы")
     @ApiResponse(responseCode = "503", description = "Недоступно в production")
@@ -265,8 +264,7 @@ public class TestAuthController {
     @Operation(
             summary = "Получить истёкший токен Bar Auth Service",
             description = "Возвращает JWT токен с истёкшим сроком действия (expired=1 час назад). " +
-                    "Используется для тестирования обработки 401 Unauthorized.",
-            tags = {"📁⚙️ Test Auth"}
+                    "Используется для тестирования обработки 401 Unauthorized."
     )
     @ApiResponse(responseCode = "200", description = "Истёкший токен сгенерирован")
     public ResponseEntity<BarAuthServiceResponse> getExpiredBarAuthToken(

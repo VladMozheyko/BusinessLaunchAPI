@@ -27,7 +27,7 @@ import java.util.UUID;
 
 /**
  * Контроллер для управления карточками заведений.
- * Франчайзи создают и редактируют карточки своих бизнес-ланчей.
+ * BAR_OWNER/BREW_OWNER создают и редактируют карточки своих бизнес-ланчей.
  */
 @Slf4j
 @Tag(name = ApiTags.VENUE_PROFILES, description = ApiTags.VENUE_PROFILES_DESC)
@@ -45,7 +45,7 @@ public class VenueProfileController {
             summary = "Создать или обновить карточку заведения",
             description = "Создаёт новую карточку бизнес-ланча или обновляет существующую. " +
                     "Включает название, описание, логотип и расписание работы по дням недели.",
-            tags = {ApiTags.VENUE_PROFILES, ApiTags.FRANCHISE_OWNER}
+            tags = {ApiTags.VENUE_PROFILES, ApiTags.BAR_BREW_OWNER}
     )
     @ApiResponse(responseCode = "200", description = "Карточка создана или обновлена")
     @ApiResponse(responseCode = "400", description = "Ошибка валидации данных")
@@ -53,27 +53,32 @@ public class VenueProfileController {
             @Parameter(description = "Данные карточки заведения", required = true)
             @Valid @RequestBody VenueProfileRequest request) {
         permissionService.checkOwnerAccess();
-        String externalIdStr = securityContextHelper.getCurrentExternalId();
+        Long venueId = securityContextHelper.getAuthenticatedUser().getVenueId();
 
-        log.info("[VENUE] Создание/обновление карточки пользователем: externalId={}", externalIdStr);
-        return ResponseEntity.ok(venueProfileService.createOrUpdate(externalIdStr, request));
+        log.info("[VENUE] Создание/обновление карточки пользователем: venueId={}", venueId);
+        return ResponseEntity.ok(venueProfileService.createOrUpdate(venueId, request));
     }
 
     @GetMapping("/my")
     @Operation(
             summary = "Получить карточку моего заведения",
-            description = "Возвращает активную карточку заведения текущего франчайзи. " +
-                    "Не требует указания ID — возвращается карточка, привязанная к текущему пользователю.",
-            tags = {ApiTags.VENUE_PROFILES, ApiTags.FRANCHISE_OWNER}
+            description = "Возвращает активную карточку заведения текущего владельца. " +
+                    "Не требует указания ID — возвращается карточка, привязанная к venueId текущего пользователя. " +
+                    "При запросе автоматически подтягивает логотип из Food Service, если он доступен.",
+            tags = {ApiTags.VENUE_PROFILES, ApiTags.BAR_BREW_OWNER}
     )
     @ApiResponse(responseCode = "200", description = "Карточка найдена")
     @ApiResponse(responseCode = "404", description = "Карточка не найдена")
     public ResponseEntity<VenueProfileResponse> getMyVenue() {
         permissionService.checkOwnerAccess();
-        String externalIdStr = securityContextHelper.getCurrentExternalId();
+        Long venueId = securityContextHelper.getAuthenticatedUser().getVenueId();
 
-        log.info("[VENUE] Просмотр карточки заведения пользователем: externalId={}", externalIdStr);
-        return ResponseEntity.ok(venueProfileService.getByOwnerUserId(externalIdStr));
+        log.info("[VENUE] Просмотр карточки заведения пользователем: venueId={}", venueId);
+        
+        // Подтягиваем логотип из Food Service (если есть)
+        venueProfileService.syncLogoFromFoodService(venueId);
+        
+        return ResponseEntity.ok(venueProfileService.getByVenueId(venueId));
     }
 
     @GetMapping("/{id}")
@@ -100,8 +105,8 @@ public class VenueProfileController {
     @Operation(
             summary = "Удалить карточку заведения",
             description = "Полное удаление карточки заведения. " +
-                    "Доступно только владельцу карточки (FRANCHISE_OWNER) и глобальному админу (GLOBAL_ADMIN).",
-            tags = {ApiTags.VENUE_PROFILES, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER}
+                    "Доступно только владельцу карточки (BAR_OWNER / BREW_OWNER) и глобальному админу (GLOBAL_ADMIN).",
+            tags = {ApiTags.VENUE_PROFILES, ApiTags.GLOBAL_ADMIN, ApiTags.BAR_BREW_OWNER}
     )
     @ApiResponse(responseCode = "204", description = "Карточка удалена")
     @ApiResponse(responseCode = "404", description = "Карточка не найдена")

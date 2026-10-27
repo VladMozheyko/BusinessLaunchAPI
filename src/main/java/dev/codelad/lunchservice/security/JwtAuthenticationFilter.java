@@ -2,8 +2,11 @@ package dev.codelad.lunchservice.security;
 
 import dev.codelad.lunchservice.config.GlobalAdminProperties;
 import dev.codelad.lunchservice.config.SecurityProperties;
+import dev.codelad.lunchservice.dto.response.ErrorResponse;
 import dev.codelad.lunchservice.entity.User;
+import dev.codelad.lunchservice.entity.VenueProfile;
 import dev.codelad.lunchservice.repository.UserRepository;
+import dev.codelad.lunchservice.repository.VenueProfileRepository;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -26,6 +29,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -63,6 +67,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final SecurityProperties securityProperties;
     private final UserRepository userRepository;
     private final GlobalAdminProperties globalAdminProperties;
+    private final VenueProfileRepository venueProfileRepository;
 
     @Override
     protected void doFilterInternal(@Nonnull HttpServletRequest request,
@@ -109,9 +114,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     validationResult.getJwtSource());
         } else {
             log.warn("[JWT] Не удалось извлечь AuthenticatedUser для запроса: {}", request.getRequestURI());
-            response.setStatus(HttpStatus.UNAUTHORIZED.value());
-            response.setContentType("application/json");
-            response.getWriter().write("{\"error\":\"UNAUTHORIZED\",\"message\":\"Недействительный токен\"}");
+            writeErrorResponse(response, HttpStatus.UNAUTHORIZED.value(), "UNAUTHORIZED", "Пользователь не аутентифицирован. Предоставьте JWT-токен в заголовке Authorization: Bearer <token>", request.getRequestURI());
             return;
         }
 
@@ -332,6 +335,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .authUserId(authUserId)
                 .userType(userType)
                 .venueId(venueId)
+                .venueProfile(user.getVenueProfile())
                 .build();
     }
 
@@ -374,6 +378,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .email(email)
                 .role(role)
                 .authorities(authorities)
+                .venueProfile(user.getVenueProfile())
                 .build();
     }
 
@@ -410,6 +415,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     /**
      * Bootstrap-привязка пользователя из Bar Auth-сервиса при первом входе.
      * Роль определяется по user_type claim из JWT.
+     * НЕ создаёт VenueProfile — он создаётся лениво при первом запросе к данным заведения.
      */
     private User bootstrapUserFromBarAuth(String externalIdStr, String email, Role role, Long venueId) {
         log.info("[BAR_AUTH_BOOTSTRAP] Пользователь не найден, создаём нового: externalId={}, role={}, venueId={}",
@@ -419,10 +425,32 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .externalId(externalIdStr)
                 .email(email)
                 .role(role)
-                .venueId(venueId)
+                .venueProfile(null) // VenueProfile будет создан лениво
                 .build();
 
         return userRepository.save(newUser);
+    }
+
+    /**
+     * Записать ErrorResponse в ответ.
+     */
+    private void writeErrorResponse(HttpServletResponse response, int status, String error, String message, String path) throws IOException {
+        response.setStatus(status);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        
+        ErrorResponse errorResponse = new ErrorResponse(
+                Instant.now().toString(),
+                status,
+                error,
+                message,
+                path
+        );
+        
+        PrintWriter writer = response.getWriter();
+        writer.write(new com.fasterxml.jackson.databind.ObjectMapper()
+                .writeValueAsString(errorResponse));
+        writer.flush();
     }
 
     /**

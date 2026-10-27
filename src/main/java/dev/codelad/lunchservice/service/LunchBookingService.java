@@ -62,10 +62,7 @@ public class LunchBookingService {
         // 4. Проверка общего количества гостей
         validateTotalGuests(totalGuests);
 
-        // 5. Проверка занятости и вместимости
-        validateCapacity(request.getVenueId(), request.getTime(), totalGuests, venue);
-
-        // 6. Создание бронирования
+        // 5. Создание бронирования
         LunchBooking booking = buildBooking(request, venue, items);
 
         LunchBooking saved = lunchBookingRepository.save(booking);
@@ -107,7 +104,7 @@ public class LunchBookingService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         String.format(Messages.DISH_NOT_FOUND, dishId)));
 
-        if (!dish.getCategoryId().equals(categoryId)) {
+        if (!dish.getCategory().getId().equals(categoryId)) {
             throw new BookingConflictException(
                     String.format(Messages.DISH_NOT_BELONGS_TO_CATEGORY, dishId, categoryId));
         }
@@ -168,19 +165,6 @@ public class LunchBookingService {
     /**
      * Проверить вместимость заведения.
      */
-    private void validateCapacity(
-            Long venueId, java.time.LocalTime time, int totalGuests, VenueProfile venue) {
-
-        Integer currentOccupancy = lunchBookingRepository.sumTotalGuestsByVenueAndTime(venueId, time);
-        Integer venueCapacity = venue.getCapacity();
-
-        if (venueCapacity != null && venueCapacity > 0 &&
-            currentOccupancy + totalGuests > venueCapacity) {
-            throw new BookingConflictException(
-                    String.format(Messages.VENUE_NO_CAPACITY, venueCapacity - currentOccupancy, venueCapacity));
-        }
-    }
-
     /**
      * Построить бронирование.
      */
@@ -280,7 +264,7 @@ public class LunchBookingService {
 
     /**
      * Подтвердить бронирование (PENDING → APPROVED).
-     * Только для FRANCHISE_OWNER, GLOBAL_ADMIN, LOCATION_ADMIN.
+     * Только для BAR/BREW OWNER, GLOBAL_ADMIN, LOCATION_MANAGER.
      * @param bookingId ID бронирования
      * @return подтверждённое бронирование
      * @throws ResourceNotFoundException если бронирование не найдено
@@ -324,7 +308,7 @@ public class LunchBookingService {
 
     /**
      * Выполнить бронирование (APPROVED → COMPLETED).
-     * Только для FRANCHISE_OWNER, GLOBAL_ADMIN, LOCATION_ADMIN.
+     * Только для BAR/BREW OWNER, GLOBAL_ADMIN, LOCATION_MANAGER.
      * @param bookingId ID бронирования
      * @return выполненное бронирование
      * @throws ResourceNotFoundException если бронирование не найдено
@@ -360,7 +344,7 @@ public class LunchBookingService {
 
     /**
      * Отменить бронирование админом (PENDING или APPROVED → CANCELLED).
-     * Только для FRANCHISE_OWNER, GLOBAL_ADMIN, LOCATION_ADMIN.
+     * Только для BAR/BREW OWNER, GLOBAL_ADMIN, LOCATION_MANAGER.
      * @param bookingId ID бронирования
      * @return отменённое бронирование
      * @throws ResourceNotFoundException если бронирование не найдено
@@ -429,8 +413,9 @@ public class LunchBookingService {
         var currentUser = securityContextHelper.getCurrentUser();
         boolean isAdmin = currentUser.getAuthorities().stream()
                 .anyMatch(a -> Objects.requireNonNull(a.getAuthority()).startsWith("ROLE_GLOBAL_ADMIN") ||
-                               a.getAuthority().startsWith("ROLE_FRANCHISE_OWNER") ||
-                               a.getAuthority().startsWith("ROLE_LOCATION_ADMIN"));
+                               a.getAuthority().startsWith("ROLE_BAR_OWNER") ||
+                               a.getAuthority().startsWith("ROLE_BREW_OWNER") ||
+                               a.getAuthority().startsWith("ROLE_LOCATION_MANAGER"));
 
         if (!isAdmin && !booking.getUserId().equals(currentUser.getUserId())) {
             throw new BookingConflictException(Messages.ACCESS_DENIED);

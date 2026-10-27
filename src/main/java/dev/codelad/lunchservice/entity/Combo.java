@@ -20,8 +20,13 @@ public class Combo {
     @Column(updatable = false, nullable = false)
     private Long id;
 
-    @Column(name = "venue_id", nullable = false)
-    private Long venueId;
+    /**
+     * Владельческое отношение к профилю заведения.
+     * При удалении профиля комбо удаляется автоматически (orphanRemoval).
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "venue_profile_id", nullable = false)
+    private VenueProfile venueProfile;
 
     @Column(nullable = false)
     private String name;

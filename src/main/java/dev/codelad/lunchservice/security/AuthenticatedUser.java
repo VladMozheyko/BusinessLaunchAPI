@@ -1,5 +1,6 @@
 package dev.codelad.lunchservice.security;
 
+import dev.codelad.lunchservice.entity.VenueProfile;
 import lombok.Builder;
 import lombok.Data;
 import org.springframework.security.core.GrantedAuthority;
@@ -25,6 +26,7 @@ public class AuthenticatedUser {
     private final Long authUserId;       // user_id из Bar Auth JWT
     private final String userType;       // "bar", "brew", "admin"
     private final Long venueId;          // bar_id / brew_id из Bar Auth JWT
+    private final VenueProfile venueProfile;  // карточка заведения (для доступа к данным)
 
     public boolean hasEmail() {
         return email != null && !email.isEmpty();

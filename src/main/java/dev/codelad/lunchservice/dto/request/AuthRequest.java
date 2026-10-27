@@ -23,10 +23,10 @@ public class AuthRequest {
             description = """
                     Email тестового пользователя. Доступные email:
                       - admin@company.com (ROLE_GLOBAL_ADMIN)
-                      - franchise@company.com (ROLE_FRANCHISE_OWNER)
-                      - location@company.com (ROLE_LOCATION_ADMIN)
+                      - bar@company.com (ROLE_BAR_OWNER)
+                      - brew@company.com (ROLE_BREW_OWNER)
+                      - manager@company.com (ROLE_LOCATION_MANAGER)
                       - user@company.com (ROLE_USER)
-                      - guest@company.com (ROLE_GUEST)
                     """,
             example = "user@company.com",
             requiredMode = Schema.RequiredMode.REQUIRED

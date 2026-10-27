@@ -27,8 +27,7 @@ public class User {
 
     /**
      * userUuid из Base Auth или user_id из Bar Auth — уникальный идентификатор из auth-сервиса.
-     * Хранится как String для поддержки UUID (550e8400-e29b-41d4-a716-446655440000)
-     * и числовых ID (1001, 2001, 3001).
+     * Хранится как String для поддержки UUID (550e8400-...) и числовых ID (1001, 2001).
      */
     @Column(name = "external_id", nullable = false, unique = true)
     private String externalId;
@@ -47,18 +46,23 @@ public class User {
     @Column(name = "email")
     private String email;
 
+    /**
+     * Имя пользователя.
+     */
     @Column(name = "name")
     private String name;
 
     /**
-     * ID заведения для BAR_OWNER и BREW_OWNER.
-     * null для GLOBAL_ADMIN и USER.
+     * Карточка заведения, к которой привязан пользователь.
+     * Один VenueProfile может иметь несколько пользователей (Bar Owner, Brew Owner, Global Admin, Location Manager).
+     * VenueId заведения можно получить через user.getVenueProfile().getVenueId().
      */
-    @Column(name = "venue_id")
-    private Long venueId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "venue_profile_id", referencedColumnName = "id")
+    private VenueProfile venueProfile;
 
     /**
-     * Количество неяв пользователя.
+     * Количество неявок пользователя.
      */
     @Column(name = "no_show_count")
     @Builder.Default

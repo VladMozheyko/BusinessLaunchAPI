@@ -128,6 +128,16 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Обработка RateLimitException (слишком много запросов).
+     */
+    @ExceptionHandler(RateLimitException.class)
+    public ResponseEntity<ErrorResponse> handleRateLimit(RateLimitException e) {
+        log.warn("[RATE_LIMIT] {}", e.getMessage());
+        ErrorResponse body = buildResponse(HttpStatus.TOO_MANY_REQUESTS, e.getMessage());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(body);
+    }
+
+    /**
      * Общая обработка всех необработанных исключений (500).
      */
     @ExceptionHandler(Exception.class)
@@ -139,7 +149,7 @@ public class GlobalExceptionHandler {
 
     private ErrorResponse buildResponse(HttpStatus httpStatus, String message) {
         return new ErrorResponse(
-                Instant.now(),
+                Instant.now().toString(),
                 httpStatus.value(),
                 httpStatus.getReasonPhrase(),
                 message,

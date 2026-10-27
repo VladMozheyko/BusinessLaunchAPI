@@ -8,11 +8,13 @@ import dev.codelad.lunchservice.dto.response.ComboResponse;
 import dev.codelad.lunchservice.entity.Category;
 import dev.codelad.lunchservice.entity.Combo;
 import dev.codelad.lunchservice.entity.Dish;
+import dev.codelad.lunchservice.entity.VenueProfile;
 import dev.codelad.lunchservice.exception.ResourceNotFoundException;
 import dev.codelad.lunchservice.exception.ValidationException;
 import dev.codelad.lunchservice.repository.CategoryRepository;
 import dev.codelad.lunchservice.repository.ComboRepository;
 import dev.codelad.lunchservice.repository.DishRepository;
+import dev.codelad.lunchservice.repository.VenueProfileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,9 +33,10 @@ public class ComboService {
     private final ComboRepository comboRepository;
     private final CategoryRepository categoryRepository;
     private final DishRepository dishRepository;
+    private final VenueProfileRepository venueProfileRepository;
 
     @Transactional
-    public Combo createCombo(CreateComboRequest request) {
+    public Combo createCombo(CreateComboRequest request, VenueProfile venueProfile) {
         // Загружаем категории по ID
         List<Category> categories = categoryRepository.findAllById(request.getCategoryIds());
         
@@ -62,7 +65,7 @@ public class ComboService {
         }
 
         Combo combo = Combo.builder()
-                .venueId(request.getVenueId())
+                .venueProfile(venueProfile)
                 .name(request.getName())
                 .price(request.getPrice())
                 .dailyLimit(request.getDailyLimit())
@@ -76,11 +79,11 @@ public class ComboService {
     }
 
     /**
-     * Получить все активные (не скрытые) комбо для заведения.
+     * Получить все активные (не скрытые) комбо для профиля заведения.
      */
     @Transactional(readOnly = true)
-    public List<ComboResponse> findByVenueId(Long venueId) {
-        List<Combo> combos = comboRepository.findByVenueIdAndHiddenFalse(venueId);
+    public List<ComboResponse> findByVenueProfile(VenueProfile venueProfile) {
+        List<Combo> combos = comboRepository.findByVenueProfileAndHiddenFalse(venueProfile);
         return combos.stream()
                 .map(ComboResponse::from)
                 .toList();

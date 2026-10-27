@@ -28,7 +28,7 @@ public class DishResponse {
     public static DishResponse from(Dish dish) {
         DishResponse response = new DishResponse();
         response.id = dish.getId();
-        response.categoryId = dish.getCategoryId();
+        response.categoryId = dish.getCategory() != null ? dish.getCategory().getId() : null;
         response.name = dish.getName();
         response.weight = dish.getWeight();
         response.weightUnit = dish.getWeightUnit();
@@ -38,7 +38,7 @@ public class DishResponse {
         response.isFreeAddon = dish.isFreeAddon();
         response.active = dish.getActive();
         response.hidden = dish.getHidden();
-        response.dishType = dish.getDishType();
+        response.dishType = dish.getDishType() != null ? dish.getDishType().getValue() : null;
         response.createdAt = dish.getCreatedAt();
         response.updatedAt = dish.getUpdatedAt();
         return response;

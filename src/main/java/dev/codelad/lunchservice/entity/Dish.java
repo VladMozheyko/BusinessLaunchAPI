@@ -6,6 +6,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
 
+import dev.codelad.lunchservice.enums.DishType;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -23,15 +25,12 @@ public class Dish {
     @Column(updatable = false, nullable = false)
     private UUID id;
 
-    @Column(name = "category_id", nullable = false)
-    private Long categoryId;
-
     /**
      * Категория, которой принадлежит блюдо.
      * При удалении категории блюдо удаляется автоматически (orphanRemoval).
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", referencedColumnName = "id", nullable = false, insertable = false, updatable = false)
+    @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
     @Column(nullable = false)
@@ -90,11 +89,20 @@ public class Dish {
     private Boolean hidden = false;
 
     /**
+     * Синхронизировано ли блюдо из Food Service.
+     * true — данные подтянуты из кассового аппарата (Food Service).
+     * false — локальное блюдо, созданное пользователем.
+     */
+    @Column(name = "synced_from_food")
+    @Builder.Default
+    private Boolean syncedFromFood = false;
+
+    /**
      * Тип блюда: MAIN (основное) или ADDON (дополнение).
      */
-    @Column(name = "dish_type", length = 10)
+    @Column(name = "dish_type", length = 10, nullable = false)
     @Builder.Default
-    private String dishType = "MAIN";
+    private DishType dishType = DishType.MAIN;
 
     /**
      * Время создания блюда (UTC).

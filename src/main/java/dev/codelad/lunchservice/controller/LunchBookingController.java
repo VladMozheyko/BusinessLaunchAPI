@@ -166,7 +166,7 @@ public class LunchBookingController {
             summary = "Подтверждение бронирования",
             description = """
                     Подтверждает бронирование, переводя его в статус APPROVED (одобрен/выполняется).
-                    Только для FRANCHISE_OWNER, GLOBAL_ADMIN, LOCATION_ADMIN.
+                    Только для BAR/BREW OWNER, GLOBAL_ADMIN, LOCATION_MANAGER.
                 """,
             tags = {ApiTags.LUNCH_BOOKINGS, ApiTags.GLOBAL_ADMIN}
     )
@@ -186,7 +186,7 @@ public class LunchBookingController {
             summary = "Выполнение бронирования",
             description = """
                     Завершает бронирование, переводя его в статус COMPLETED (выполнен).
-                    Только для FRANCHISE_OWNER, GLOBAL_ADMIN, LOCATION_ADMIN.
+                    Только для BAR/BREW OWNER, GLOBAL_ADMIN, LOCATION_MANAGER.
                 """,
             tags = {ApiTags.LUNCH_BOOKINGS, ApiTags.GLOBAL_ADMIN}
     )
@@ -206,7 +206,7 @@ public class LunchBookingController {
             summary = "Отмена бронирования админом",
             description = """
                     Отменяет бронирование из статусов PENDING или APPROVED.
-                    Только для FRANCHISE_OWNER, GLOBAL_ADMIN, LOCATION_ADMIN.
+                    Только для BAR/BREW OWNER, GLOBAL_ADMIN, LOCATION_MANAGER.
                 """,
             tags = {ApiTags.LUNCH_BOOKINGS, ApiTags.GLOBAL_ADMIN}
     )
@@ -227,7 +227,7 @@ public class LunchBookingController {
             description = """
                     Отмечает бронирование как неявка (пользователь не пришёл).
                     Increment noShowCount для пользователя.
-                    Только для FRANCHISE_OWNER, GLOBAL_ADMIN, LOCATION_ADMIN.
+                    Только для BAR/BREW OWNER, GLOBAL_ADMIN, LOCATION_MANAGER.
                 """,
             tags = {ApiTags.LUNCH_BOOKINGS, ApiTags.GLOBAL_ADMIN}
     )

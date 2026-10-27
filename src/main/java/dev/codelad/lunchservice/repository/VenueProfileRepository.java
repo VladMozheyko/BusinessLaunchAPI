@@ -4,14 +4,18 @@ import dev.codelad.lunchservice.entity.VenueProfile;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Repository
 public interface VenueProfileRepository extends JpaRepository<VenueProfile, Long> {
 
-    List<VenueProfile> findByExternalId(String externalId);
-
+    /**
+     * Найти карточку заведения по venueId (из Bar Auth JWT: bar_id/brew_id).
+     */
     Optional<VenueProfile> findByVenueId(Long venueId);
+
+    /**
+     * Проверить, существует ли карточка заведения с указанным venueId.
+     */
+    boolean existsByVenueId(Long venueId);
 }

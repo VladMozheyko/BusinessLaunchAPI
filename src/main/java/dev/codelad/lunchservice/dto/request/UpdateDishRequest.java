@@ -1,5 +1,6 @@
 package dev.codelad.lunchservice.dto.request;
 
+import dev.codelad.lunchservice.enums.DishType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
@@ -30,5 +31,5 @@ public class UpdateDishRequest {
     private Integer quantity;
 
     @Schema(description = "Тип блюда: MAIN (основное) или ADDON (дополнение)", example = "MAIN")
-    private String dishType;
+    private DishType dishType;
 }

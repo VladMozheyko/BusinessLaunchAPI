@@ -20,10 +20,6 @@ import java.util.List;
 @Schema(description = "Запрос на создание нового комбо-набора")
 public class CreateComboRequest {
 
-    @NotNull(message = "venueId обязателен")
-    @Schema(description = "ID заведения", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
-    private Long venueId;
-
     @NotBlank(message = "Название комбо обязательно")
     @Schema(description = "Название комбо-набора", example = "Комбо Бизнес", requiredMode = Schema.RequiredMode.REQUIRED)
     private String name;

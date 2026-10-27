@@ -118,7 +118,7 @@ public class ComboBookingService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         String.format(Messages.COMBO_NOT_FOUND, comboId)));
 
-        if (!combo.getVenueId().equals(venueId)) {
+        if (!combo.getVenueProfile().getVenueId().equals(venueId)) {
             throw new BookingConflictException(
                     String.format(Messages.COMBO_NOT_BELONGS_TO_VENUE, comboId, venueId));
         }

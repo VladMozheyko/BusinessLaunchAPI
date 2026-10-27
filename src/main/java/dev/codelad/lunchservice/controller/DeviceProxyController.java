@@ -2,15 +2,19 @@ package dev.codelad.lunchservice.controller;
 
 import dev.codelad.lunchservice.config.swagger.ApiTags;
 import dev.codelad.lunchservice.dto.request.DeviceRegistrationRequest;
+import dev.codelad.lunchservice.dto.response.ErrorResponse;
 import dev.codelad.lunchservice.repository.NotificationFeignClient;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.Map;
 
 /**
@@ -55,8 +59,9 @@ public class DeviceProxyController {
     @PostMapping("/register-device")
     @Operation(summary = "Зарегистрировать устройство",
         description = "Проксирует запрос в Notification Service для регистрации FCM/APNs токена")
-    public ResponseEntity<Map<String, Object>> registerDevice(
-            @Valid @RequestBody DeviceRegistrationRequest request) {
+    public ResponseEntity<Object> registerDevice(
+            @Valid @RequestBody DeviceRegistrationRequest request,
+            HttpServletRequest httpRequest) {
         
         log.info("[DEVICE_PROXY] Регистрируем устройство для пользователя");
 
@@ -68,11 +73,14 @@ public class DeviceProxyController {
             return ResponseEntity.ok(response.getBody());
         } catch (Exception e) {
             log.error("[DEVICE_PROXY] Ошибка при регистрации устройства: {}", e.getMessage(), e);
-            return ResponseEntity.status(500).body(Map.of(
-                "success", false,
-                "error", "INTERNAL_ERROR",
-                "message", "Ошибка при регистрации устройства"
-            ));
+            ErrorResponse errorResponse = new ErrorResponse(
+                    Instant.now().toString(),
+                    HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                    "INTERNAL_ERROR",
+                    "Ошибка при регистрации устройства",
+                    httpRequest.getRequestURI()
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
 }

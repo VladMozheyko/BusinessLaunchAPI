@@ -7,14 +7,18 @@ import dev.codelad.lunchservice.dto.request.UpdateComboStatusRequest;
 import dev.codelad.lunchservice.dto.response.ComboFullResponse;
 import dev.codelad.lunchservice.dto.response.ComboResponse;
 import dev.codelad.lunchservice.entity.Combo;
+import dev.codelad.lunchservice.entity.VenueProfile;
 import dev.codelad.lunchservice.security.PermissionService;
+import dev.codelad.lunchservice.security.SecurityContextHelper;
 import dev.codelad.lunchservice.service.ComboService;
+import dev.codelad.lunchservice.service.VenueProfileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -24,7 +28,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -32,6 +35,7 @@ import java.util.List;
 /**
  * Контроллер для управления комбо-наборами.
  */
+@Slf4j
 @Tag(name = ApiTags.COMBOS, description = ApiTags.COMBOS_DESC)
 @RestController
 @RequestMapping("/api/v1/lunch")
@@ -39,6 +43,8 @@ import java.util.List;
 public class ComboController {
 
     private final ComboService comboService;
+    private final VenueProfileService venueProfileService;
+    private final SecurityContextHelper securityContextHelper;
     private final PermissionService permissionService;
 
     @GetMapping("/combo")
@@ -75,9 +81,9 @@ public class ComboController {
             summary = "Создание комбо",
             description = """
                     Создаёт новый комбо-набор.
-                    Доступно только для GL и FO.
+                    Доступно только для GL и BAR/BREW OWNER.
                 """,
-            tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER}
+            tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN, ApiTags.BAR_BREW_OWNER}
     )
     @ApiResponse(responseCode = "201", description = "Комбо успешно создано")
     @ApiResponse(responseCode = "400", description = "Ошибка валидации данных")
@@ -85,7 +91,9 @@ public class ComboController {
             @Parameter(description = "Данные для создания комбо", required = true)
             @Valid @RequestBody CreateComboRequest request) {
         permissionService.checkGlobalAdminOrOwnerAccess();
-        Combo combo = comboService.createCombo(request);
+        Long venueId = securityContextHelper.getAuthenticatedUser().getVenueId();
+        VenueProfile venueProfile = venueProfileService.getOrCreateVenueProfile(venueId);
+        Combo combo = comboService.createCombo(request, venueProfile);
         return ResponseEntity.status(HttpStatus.CREATED).body(ComboResponse.from(combo));
     }
 
@@ -93,17 +101,19 @@ public class ComboController {
     @Operation(
             summary = "Получить все мои комбо для заведения",
             description = """
-                    Возвращает все комбо для указанного заведения Франчайзи.
-                    Доступно для GL, FO и LA.
+                    Возвращает все комбо для указанного заведения.
+                    Доступно для GL, BAR/BREW OWNER и LM.
                 """,
-            tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
+            tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN, ApiTags.BAR_BREW_OWNER, ApiTags.LOCATION_MANAGER}
     )
     @ApiResponse(responseCode = "200", description = "Список комбо")
-    public List<ComboResponse> findMyCombosByVenueId(
-            @Parameter(description = "ID заведения", required = true)
-            @RequestParam Long venueId) {
+    public List<ComboResponse> findMyCombosByVenueId() {
         permissionService.checkGlobalAdminOrOwnerAccess();
-        return comboService.findByVenueId(venueId);
+        Long venueId = securityContextHelper.getAuthenticatedUser().getVenueId();
+        VenueProfile venueProfile = venueProfileService.getOrCreateVenueProfile(venueId);
+
+        log.info("[COMBO] Просмотр списка комбо пользователем: venueId={}", venueId);
+        return comboService.findByVenueProfile(venueProfile);
     }
 
     @PatchMapping("/combo/{id}/status")
@@ -111,9 +121,9 @@ public class ComboController {
             summary = "Изменение активности комбо",
             description = """
                     Включает или выключает комбо-набор.
-                    Доступно для GL, FO и LA.
+                    Доступно для GL, BAR/BREW OWNER и LM.
                 """,
-            tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
+            tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN, ApiTags.BAR_BREW_OWNER, ApiTags.LOCATION_MANAGER}
     )
     @ApiResponse(responseCode = "200", description = "Статус комбо обновлён")
     @ApiResponse(responseCode = "404", description = "Комбо не найдено")
@@ -132,9 +142,9 @@ public class ComboController {
             summary = "Обновление параметров комбо",
             description = """
                     Обновляет название, цену и/или дневной лимит комбо.
-                    Доступно для GL, FO и LA.
+                    Доступно для GL, BAR/BREW OWNER и LM.
                 """,
-            tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
+            tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN, ApiTags.BAR_BREW_OWNER, ApiTags.LOCATION_MANAGER}
     )
     @ApiResponse(responseCode = "200", description = "Комбо обновлено")
     @ApiResponse(responseCode = "404", description = "Комбо не найдено")
@@ -154,9 +164,9 @@ public class ComboController {
             description = """
                     Скрывает комбо-набор (устанавливает isHidden=true).
                     Нельзя скрыть комбо с активными заказами.
-                    Доступно для GL, FO и LA.
+                    Доступно для GL, BAR/BREW OWNER и LM.
                 """,
-            tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
+            tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN, ApiTags.BAR_BREW_OWNER, ApiTags.LOCATION_MANAGER}
     )
     @ApiResponse(responseCode = "204", description = "Комбо скрыто")
     @ApiResponse(responseCode = "404", description = "Комбо не найдено")

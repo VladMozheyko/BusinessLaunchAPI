@@ -166,7 +166,7 @@ public class ComboBookingController {
             summary = "Подтверждение бронирования комбо",
             description = """
                     Подтверждает бронирование, переводя его в статус APPROVED.
-                    Только для FRANCHISE_OWNER, GLOBAL_ADMIN, LOCATION_ADMIN.
+                    Только для BAR/BREW OWNER, GLOBAL_ADMIN, LOCATION_MANAGER.
                 """,
             tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN}
     )
@@ -186,7 +186,7 @@ public class ComboBookingController {
             summary = "Выполнение бронирования комбо",
             description = """
                     Завершает бронирование, переводя его в статус COMPLETED.
-                    Только для FRANCHISE_OWNER, GLOBAL_ADMIN, LOCATION_ADMIN.
+                    Только для BAR/BREW OWNER, GLOBAL_ADMIN, LOCATION_MANAGER.
                 """,
             tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN}
     )
@@ -206,7 +206,7 @@ public class ComboBookingController {
             summary = "Отмена бронирования комбо админом",
             description = """
                     Отменяет бронирование из статусов PENDING или APPROVED.
-                    Только для FRANCHISE_OWNER, GLOBAL_ADMIN, LOCATION_ADMIN.
+                    Только для BAR/BREW OWNER, GLOBAL_ADMIN, LOCATION_MANAGER.
                 """,
             tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN}
     )
@@ -227,7 +227,7 @@ public class ComboBookingController {
             description = """
                     Отмечает бронирование комбо как неявка (пользователь не пришёл).
                     Increment noShowCount для пользователя.
-                    Только для FRANCHISE_OWNER, GLOBAL_ADMIN, LOCATION_ADMIN.
+                    Только для BAR/BREW OWNER, GLOBAL_ADMIN, LOCATION_MANAGER.
                 """,
             tags = {ApiTags.COMBOS, ApiTags.GLOBAL_ADMIN}
     )

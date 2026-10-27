@@ -25,7 +25,7 @@ public class ComboResponse {
     public static ComboResponse from(Combo combo) {
         ComboResponse response = new ComboResponse();
         response.id = combo.getId();
-        response.venueId = combo.getVenueId();
+        response.venueId = combo.getVenueProfile() != null ? combo.getVenueProfile().getVenueId() : null;
         response.name = combo.getName();
         response.price = combo.getPrice();
         response.isActive = combo.isActive();

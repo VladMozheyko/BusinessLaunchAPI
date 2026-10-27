@@ -1,6 +1,7 @@
 package dev.codelad.lunchservice.repository;
 
 import dev.codelad.lunchservice.entity.Dish;
+import dev.codelad.lunchservice.entity.VenueProfile;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,8 +21,8 @@ public interface DishRepository extends JpaRepository<Dish, UUID> {
     /**
      * Найти все активные блюда для заведения (через категории).
      */
-    @Query("SELECT d FROM Dish d WHERE d.category.venueId = :venueId AND d.active = true")
-    List<Dish> findByVenueIdActive(@Param("venueId") Long venueId);
+    @Query("SELECT d FROM Dish d WHERE d.category.venueProfile = :venueProfile AND d.active = true")
+    List<Dish> findByVenueProfileActive(@Param("venueProfile") VenueProfile venueProfile);
 
     /**
      * Найти все активные блюда для категории (с фильтром по active).

@@ -1,6 +1,7 @@
 package dev.codelad.lunchservice.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.codelad.lunchservice.dto.response.ErrorResponse;
 import dev.codelad.lunchservice.security.JwtAuthenticationFilter;
 import dev.codelad.lunchservice.security.Role;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +23,6 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.time.Instant;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -61,33 +61,47 @@ public class SecurityConfig {
 
     /**
      * AuthenticationEntryPoint — возвращает 401 при отсутствии аутентификации.
+     * Использует единый формат ErrorResponse для консистентности ответов.
      */
     @Bean
     public org.springframework.security.web.AuthenticationEntryPoint authenticationEntryPoint() {
         return (request, response, authException) -> {
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            response.setCharacterEncoding("UTF-8");
             response.setStatus(HttpStatus.UNAUTHORIZED.value());
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("error", "AUTHENTICATION_REQUIRED");
-            body.put("message", "Пользователь не аутентифицирован. Отправьте JWT-токен в заголовке Authorization: Bearer <token>");
-            body.put("timestamp", Instant.now().toString());
-            response.getWriter().write(new ObjectMapper().writeValueAsString(body));
+            
+            ErrorResponse errorResponse = new ErrorResponse(
+                    Instant.now().toString(),
+                    HttpStatus.UNAUTHORIZED.value(),
+                    "UNAUTHORIZED",
+                    "Пользователь не аутентифицирован. Предоставьте JWT-токен в заголовке Authorization: Bearer <token>",
+                    request.getRequestURI()
+            );
+            
+            response.getWriter().write(new ObjectMapper().writeValueAsString(errorResponse));
         };
     }
 
     /**
      * AccessDeniedHandler — возвращает 403 при отсутствии прав.
+     * Использует единый формат ErrorResponse для консистентности ответов.
      */
     @Bean
     public org.springframework.security.web.access.AccessDeniedHandler accessDeniedHandler() {
         return (request, response, accessDeniedException) -> {
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            response.setCharacterEncoding("UTF-8");
             response.setStatus(HttpStatus.FORBIDDEN.value());
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("error", "ACCESS_DENIED");
-            body.put("message", "У вас нет прав для выполнения этого действия");
-            body.put("timestamp", Instant.now().toString());
-            response.getWriter().write(new ObjectMapper().writeValueAsString(body));
+            
+            ErrorResponse errorResponse = new ErrorResponse(
+                    Instant.now().toString(),
+                    HttpStatus.FORBIDDEN.value(),
+                    "FORBIDDEN",
+                    "У вас нет прав для выполнения этого действия",
+                    request.getRequestURI()
+            );
+            
+            response.getWriter().write(new ObjectMapper().writeValueAsString(errorResponse));
         };
     }
 

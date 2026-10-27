@@ -1,10 +1,12 @@
 package dev.codelad.lunchservice.repository;
 
 import dev.codelad.lunchservice.entity.User;
+import dev.codelad.lunchservice.entity.VenueProfile;
 import dev.codelad.lunchservice.security.Role;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -23,4 +25,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
      * Используется для защиты bootstrap-логики.
      */
     boolean existsByRole(Role role);
+
+    /**
+     * Найти всех пользователей, привязанных к карточке заведения.
+     */
+    List<User> findByVenueProfile(VenueProfile venueProfile);
 }

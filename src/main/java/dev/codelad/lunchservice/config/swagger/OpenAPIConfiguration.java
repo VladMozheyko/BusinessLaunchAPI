@@ -7,18 +7,31 @@ import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
+import io.swagger.v3.oas.models.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 /**
  * Конфигурация Swagger/OpenAPI документации.
- * Настраивает заголовок API, схему аутентификации bearer JWT и описания тегов.
+ * Настраивает заголовок API, схему аутентификации bearer JWT и порядок тегов.
+ * 
+ * <p>Порядок тегов в Swagger UI (строго заданный):
+ * <ol>
+ *   <li>Веню (карточки заведений)</li>
+ *   <li>Синхронизация (Food Service)</li>
+ *   <li>Вход/сервис (аутентификация)</li>
+ *   <li>Настройки уведомлений</li>
+ *   <li>Бронирование</li>
+ *   <li>Комбо</li>
+ *   <li>Блюда</li>
+ *   <li>Категории</li>
+ *   <li>Устройства</li>
+ * </ol>
  */
+@Slf4j
 @Configuration
 public class OpenAPIConfiguration {
 
@@ -48,27 +61,44 @@ public class OpenAPIConfiguration {
                         .addList("bearerAuth"));
     }
 
+    /**
+     * Настраивает теги Swagger в строгом порядке, определённом пользователем.
+     * Теги добавляются в том порядке, в котором они отображаются в Swagger UI.
+     */
     @Bean
     public OpenApiCustomizer openApiCustomizer() {
         return openApi -> {
             openApi.getServers().clear();
             openApi.getServers().add(new Server().url(serverUrl));
 
-            // Добавляем описания к тегам
-            Map<String, String> tagDescriptions = new LinkedHashMap<>();
-            tagDescriptions.put(ApiTags.PRESENTATION, ApiTags.PRESENTATION_DESC);
-            tagDescriptions.put(ApiTags.CATEGORIES, ApiTags.CATEGORIES_DESC);
-            tagDescriptions.put(ApiTags.DISHES, ApiTags.DISHES_DESC);
-            tagDescriptions.put(ApiTags.COMBOS, ApiTags.COMBOS_DESC);
-            tagDescriptions.put(ApiTags.LUNCH_BOOKINGS, ApiTags.LUNCH_BOOKINGS_DESC);
-            tagDescriptions.put(ApiTags.GLOBAL_ADMIN, ApiTags.GLOBAL_ADMIN_DESC);
-            tagDescriptions.put(ApiTags.FRANCHISE_OWNER, ApiTags.FRANCHISE_OWNER_DESC);
-            tagDescriptions.put(ApiTags.LOCATION_ADMIN, ApiTags.LOCATION_ADMIN_DESC);
-            tagDescriptions.put(ApiTags.USER, ApiTags.USER_DESC);
+            // Удаляем автоматически добавленные теги (если есть)
+            if (openApi.getTags() != null) {
+                openApi.getTags().clear();
+            }
 
-            tagDescriptions.forEach((name, description) ->
-                    openApi.getTags().add(new io.swagger.v3.oas.models.tags.Tag().name(name).description(description))
-            );
+            // Регистрируем теги в СТРОГО ЗАДАННОМ ПОРЯДКЕ
+            registerTag(openApi, ApiTags.AUTH, ApiTags.AUTH_DESC);
+            registerTag(openApi, ApiTags.VENUE_PROFILES, ApiTags.VENUE_PROFILES_DESC);
+            registerTag(openApi, ApiTags.CATEGORIES, ApiTags.CATEGORIES_DESC);
+            registerTag(openApi, ApiTags.DISHES, ApiTags.DISHES_DESC);
+            registerTag(openApi, ApiTags.COMBOS, ApiTags.COMBOS_DESC);
+            registerTag(openApi, ApiTags.LUNCH_BOOKINGS, ApiTags.LUNCH_BOOKINGS_DESC);
+            registerTag(openApi, ApiTags.FOOD_SYNC, ApiTags.FOOD_SYNC_DESC);
+            registerTag(openApi, ApiTags.PREFERENCES, ApiTags.PREFERENCES_DESC);
+            registerTag(openApi, ApiTags.DEVICES, ApiTags.DEVICES_DESC);
+
+            log.info("Зарегистрировано {} тегов в заданном порядке", openApi.getTags().size());
         };
+    }
+
+    /**
+     * Вспомогательный метод для регистрации одного тега.
+     */
+    private void registerTag(OpenAPI openApi, String tagName, String tagDescription) {
+        if (tagName != null && tagDescription != null) {
+            Tag tag = new Tag().name(tagName).description(tagDescription);
+            openApi.getTags().add(tag);
+            log.debug("Зарегистрирован тег: {} = {}", tagName, tagDescription);
+        }
     }
 }

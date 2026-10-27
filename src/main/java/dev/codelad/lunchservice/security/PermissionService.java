@@ -100,12 +100,14 @@ public class PermissionService {
 
     /**
      * Проверить что пользователь является владельцем или менеджером заведения.
+     * Для Bar Auth пользователей venueProfile может быть null (lazy init).
+     * Используем user.getVenueId() для проверки.
      */
     public void checkVenueAccess(Long venueId) {
         AuthenticatedUser user = securityContextHelper.getCurrentUser();
         
         // Владелец (BAR_OWNER/BREW_OWNER) автоматически имеет доступ к своему venueId
-        if (user.isOwner() && user.getVenueId() != null && user.getVenueId().equals(venueId)) {
+        if (user.isOwner() && venueId.equals(user.getVenueId())) {
             return;
         }
         

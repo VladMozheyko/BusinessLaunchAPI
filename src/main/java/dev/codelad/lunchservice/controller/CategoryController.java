@@ -43,7 +43,7 @@ public class CategoryController {
     @Operation(
             summary = "Создание категории",
             description = "Создаёт новую категорию блюд. Проверяет существование заведения через venue-service.",
-            tags = {ApiTags.CATEGORIES, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
+            tags = {ApiTags.CATEGORIES, ApiTags.GLOBAL_ADMIN, ApiTags.BAR_BREW_OWNER, ApiTags.LOCATION_MANAGER}
     )
     @ApiResponse(responseCode = "201", description = "Категория успешно создана")
     @ApiResponse(responseCode = "400", description = "Ошибка валидации данных")
@@ -62,7 +62,7 @@ public class CategoryController {
             description = "Возвращает все категории для заведения вместе со всеми блюдами. " +
                     "Параметры: includeHiddenCategories - включать скрытые категории, " +
                     "includeHiddenDishes - включать скрытые блюда.",
-            tags = {ApiTags.CATEGORIES, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN, ApiTags.USER}
+            tags = {ApiTags.CATEGORIES, ApiTags.GLOBAL_ADMIN, ApiTags.BAR_BREW_OWNER, ApiTags.LOCATION_MANAGER, ApiTags.USER}
     )
     @ApiResponse(responseCode = "200", description = "Список категорий с блюдами")
     public ResponseEntity<List<CategoryFullResponse>> getAllCategoriesWithDishes(
@@ -88,7 +88,7 @@ public class CategoryController {
             summary = "Получить все мои категории для заведения",
             description = "Возвращает все категории для указанного заведения. " +
                     "includeHidden - включать скрытые категории (по умолчанию false).",
-            tags = {ApiTags.CATEGORIES, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
+            tags = {ApiTags.CATEGORIES, ApiTags.GLOBAL_ADMIN, ApiTags.BAR_BREW_OWNER, ApiTags.LOCATION_MANAGER}
     )
     @ApiResponse(responseCode = "200", description = "Список категорий")
     public List<CategoryResponse> findMyCategoriesByVenueId(
@@ -105,7 +105,7 @@ public class CategoryController {
             summary = "Переключить видимость категории",
             description = "Если категория скрыта — покажет, если показана — скроет. " +
                     "Это позволяет создавать категории с тем же названием повторно.",
-            tags = {ApiTags.CATEGORIES, ApiTags.GLOBAL_ADMIN, ApiTags.FRANCHISE_OWNER, ApiTags.LOCATION_ADMIN}
+            tags = {ApiTags.CATEGORIES, ApiTags.GLOBAL_ADMIN, ApiTags.BAR_BREW_OWNER, ApiTags.LOCATION_MANAGER}
     )
     @ApiResponse(responseCode = "200", description = "Категория обновлена")
     @ApiResponse(responseCode = "404", description = "Категория не найдена")

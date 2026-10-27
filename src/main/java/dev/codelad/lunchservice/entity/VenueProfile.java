@@ -6,7 +6,6 @@ import lombok.*;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Карточка заведения (Venue Profile).
@@ -14,8 +13,13 @@ import java.util.UUID;
  * 
  * Создаётся автоматически при первом входе BAR_OWNER/BREW_OWNER:
  * - venueId — из Bar Auth JWT (bar_id/brew_id)
- * - ownerUserId — из Bar Auth JWT (user_id)
  * - name, description, logoUrl — заполняет пользователь позже
+ * 
+ * К одному VenueProfile могут быть привязаны несколько пользователей:
+ * - BAR_OWNER (владелец бара)
+ * - BREW_OWNER (владелец пивоварни)
+ * - GLOBAL_ADMIN (глобальный администратор)
+ * - LOCATION_MANAGER (локальный менеджер)
  */
 @Entity
 @Table(name = "venue_profiles")
@@ -38,18 +42,6 @@ public class VenueProfile {
     private Long venueId;
 
     /**
-     * externalId владельца (из JWT — userUuid или user_id как String).
-     */
-    @Column(name = "external_id")
-    private String externalId;
-
-    /**
-     * ID пользователя-владельца заведения (для обратной совместимости).
-     */
-    @Column(name = "owner_user_id")
-    private UUID ownerUserId;
-
-    /**
      * Название заведения (заполняет пользователь).
      */
     @Column(name = "name")
@@ -66,12 +58,6 @@ public class VenueProfile {
      */
     @Column(name = "logo_url")
     private String logoUrl;
-
-    /**
-     * Вместимость заведения (заполняет пользователь).
-     */
-    @Column(name = "capacity")
-    private Integer capacity;
 
     /**
      * Бронирования этого заведения.

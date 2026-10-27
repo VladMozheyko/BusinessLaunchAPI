@@ -9,7 +9,6 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalTime;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Ответ с информацией о карточке заведения.
@@ -21,7 +20,7 @@ import java.util.UUID;
 public class VenueProfileResponse {
 
     private Long id;
-    private UUID ownerUserId;
+    private Long venueId;
     private String name;
     private String description;
     private String logoUrl;
@@ -30,7 +29,7 @@ public class VenueProfileResponse {
     public static VenueProfileResponse from(VenueProfile profile, List<VenueSchedule> schedules) {
         return VenueProfileResponse.builder()
                 .id(profile.getId())
-                .ownerUserId(profile.getOwnerUserId())
+                .venueId(profile.getVenueId())
                 .name(profile.getName())
                 .description(profile.getDescription())
                 .logoUrl(profile.getLogoUrl())

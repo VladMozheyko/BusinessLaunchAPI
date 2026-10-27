@@ -6,12 +6,15 @@ import dev.codelad.lunchservice.dto.request.UpdateDishRequest;
 import dev.codelad.lunchservice.dto.request.UpdateFreeAddonRequest;
 import dev.codelad.lunchservice.dto.response.DishResponse;
 import dev.codelad.lunchservice.entity.Dish;
+import dev.codelad.lunchservice.entity.VenueProfile;
+import dev.codelad.lunchservice.enums.DishType;
 import dev.codelad.lunchservice.exception.DishNotFoundException;
 import dev.codelad.lunchservice.exception.ResourceNotFoundException;
 import dev.codelad.lunchservice.exception.ValidationException;
 import dev.codelad.lunchservice.repository.CategoryRepository;
 import dev.codelad.lunchservice.repository.DishRepository;
 import dev.codelad.lunchservice.repository.LunchBookingRepository;
+import dev.codelad.lunchservice.repository.VenueProfileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,6 +32,7 @@ public class DishService {
     private final DishRepository dishRepository;
     private final CategoryRepository categoryRepository;
     private final LunchBookingRepository lunchBookingRepository;
+    private final VenueProfileRepository venueProfileRepository;
 
     @Transactional
     public Dish createDish(CreateDishRequest request) {
@@ -39,7 +43,7 @@ public class DishService {
         }
 
         Dish dish = Dish.builder()
-                .categoryId(request.getCategoryId())
+                .category(categoryRepository.findById(request.getCategoryId()).orElseThrow())
                 .name(request.getName())
                 .weight(request.getWeight())
                 .weightUnit(request.getWeightUnit())
@@ -48,7 +52,7 @@ public class DishService {
                 .quantity(request.getQuantity())
                 .isFreeAddon(request.getIsFreeAddon() != null && request.getIsFreeAddon())
                 .active(true)
-                .dishType(request.getDishType() != null ? request.getDishType() : "MAIN")
+                .dishType(request.getDishType() != null ? request.getDishType() : DishType.MAIN)
                 .build();
 
         return dishRepository.save(dish);
@@ -75,7 +79,11 @@ public class DishService {
      */
     @Transactional(readOnly = true)
     public List<DishResponse> findByVenueId(Long venueId) {
-        List<Dish> dishes = dishRepository.findByVenueIdActive(venueId);
+        VenueProfile venueProfile = venueProfileRepository.findByVenueId(venueId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Заведение с ID: " + venueId + " не найдено"));
+        
+        List<Dish> dishes = dishRepository.findByVenueProfileActive(venueProfile);
         return dishes.stream()
                 .map(DishResponse::from)
                 .toList();

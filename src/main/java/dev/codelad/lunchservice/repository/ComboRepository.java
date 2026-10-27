@@ -1,6 +1,7 @@
 package dev.codelad.lunchservice.repository;
 
 import dev.codelad.lunchservice.entity.Combo;
+import dev.codelad.lunchservice.entity.VenueProfile;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,9 +13,14 @@ import java.util.List;
 public interface ComboRepository extends JpaRepository<Combo, Long> {
 
     /**
-     * Найти все активные (не скрытые) комбо для заведения.
+     * Найти все активные (не скрытые) комбо для профиля заведения.
      */
-    List<Combo> findByVenueIdAndHiddenFalse(Long venueId);
+    List<Combo> findByVenueProfileAndHiddenFalse(VenueProfile venueProfile);
+
+    /**
+     * Найти все активные комбо для профиля заведения (включая скрытые).
+     */
+    List<Combo> findByVenueProfile(VenueProfile venueProfile);
 
     /**
      * Проверить, есть ли активные заказы для блюд в категориях комбо.

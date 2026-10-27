@@ -22,7 +22,7 @@ public class CategoryResponse {
         CategoryResponse response = new CategoryResponse();
         response.id = category.getId();
         response.name = category.getName();
-        response.venueId = category.getVenueId();
+        response.venueId = category.getVenueProfile().getVenueId();
         response.hidden = category.getHidden();
         response.createdAt = category.getCreatedAt();
         response.updatedAt = category.getUpdatedAt();

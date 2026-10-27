@@ -2,6 +2,7 @@ package dev.codelad.lunchservice.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -14,6 +15,7 @@ import java.util.List;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 public class Category {
 
     @Id
@@ -21,8 +23,13 @@ public class Category {
     @Column(updatable = false, nullable = false)
     private Long id;
 
-    @Column(name = "venue_id", nullable = false)
-    private Long venueId;
+    /**
+     * Карточка заведения, к которой привязана категория.
+     * Один VenueProfile может иметь несколько категорий.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "venue_profile_id", nullable = false, referencedColumnName = "id")
+    private VenueProfile venueProfile;
 
     @Column(nullable = false, length = 255)
     private String name;
@@ -32,6 +39,15 @@ public class Category {
      */
     @Column(name = "hidden")
     private Boolean hidden = false;
+
+    /**
+     * Синхронизирована ли категория из Food Service.
+     * true — данные подтянуты из кассового аппарата (Food Service).
+     * false — локальная категория, созданная пользователем.
+     */
+    @Column(name = "synced_from_food")
+    @Builder.Default
+    private Boolean syncedFromFood = false;
 
     /**
      * Блюда, принадлежащие этой категории.
