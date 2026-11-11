@@ -2,60 +2,67 @@ name: lunchservice
 
 services:
   # ==================== MySQL ====================
-  mysql:
-    image: mysql:8.0
-    container_name: lunchservice-mysql
+  lunchservice_db:
+    image: mysql:8.0-oraclelinux8
+    container_name: cb_lunchservice_db
     restart: unless-stopped
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-    env_file:
-      - .env.docker.dev
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
-      MYSQL_DATABASE: lunch_service
-      MYSQL_USER: ${DB_USERNAME}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "3307:3306"
+      - MYSQL_DATABASE=lunch_service
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_ROOT_HOST=%
+      - TZ=Europe/Moscow
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --innodb-buffer-pool-size=256M
+      - --innodb-redo-log-capacity=128M
+      - --max-connections=50
+      - --tmp-table-size=16M
+      - --max-heap-table-size=16M
+      - --thread-cache-size=8
+      - --table-open-cache=400
+      - --skip-name-resolve
     volumes:
-      - mysql_data:/var/lib/mysql
+      - ./data/lunchservice/mysql:/var/lib/mysql
+      - ./logs/lunchservice/mysql:/var/log/mysql
     networks:
-      - lunchservice-network
+      - cb-network
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpassword"]
+      interval: 30s
+      timeout: 10s
       retries: 5
-      start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+      start_period: 60s
 
   # ==================== Lunch Service ====================
   lunch-service:
-    build: .
-    container_name: lunch-service
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cb_lunchservice_svc
     restart: unless-stopped
-    env_file:
-      - .env
-      - .env.docker.dev
-    environment:
-      ENABLE_DOTENV_LOADER: "false"
-    mem_limit: 1g
-    ports:
-      - "8080:8080"
     depends_on:
-      mysql:
+      lunchservice_db:
         condition: service_healthy
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SERVER_PORT=8085
+      - SERVER_SSL_ENABLED=false
+      - SPRING_DATASOURCE_URL=jdbc:mysql://lunchservice_db:3306/lunch_service?serverTimezone=Europe/Moscow&useSSL=false&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=rootpassword
+      - NOTIFICATION_INTERNAL_SERVICE_KEY=${NOTIFICATION_INTERNAL_SERVICE_KEY}
+      - FOOD_SERVICE_URL=http://food-service:8080
+      - TZ=Europe/Moscow
+    mem_limit: 1g
     networks:
-      - lunchservice-network
+      - cb-network
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8085/actuator/health || exit 1"]
       interval: 30s
-      timeout: 10s
-      retries: 3
+      timeout: 5s
       start_period: 60s
+      retries: 3
     logging:
       driver: json-file
       options:
@@ -63,9 +70,9 @@ services:
         max-file: "3"
 
 volumes:
-  mysql_data:
+  lunchservice_mysql_data:
     driver: local
 
 networks:
-  lunchservice-network:
+  cb-network:
     driver: bridge
