@@ -45,10 +45,11 @@ public final class DotenvLoader {
         if (profile == null) {
             log.error("SPRING_PROFILES_ACTIVE не задан. Загрузка невозможна.");
             return;
+        } else if ((profile).equalsIgnoreCase("dev") || (profile).equalsIgnoreCase("prod")) {
+            log.info("Профиль: {}, параметры не загружаем", profile);
         }
         
         log.info("Загрузка .env для профиля: {}", profile);
-
         loadFile();
     }
 
