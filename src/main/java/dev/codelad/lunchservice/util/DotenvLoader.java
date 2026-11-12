@@ -47,6 +47,7 @@ public final class DotenvLoader {
             return;
         } else if ((profile).equalsIgnoreCase("dev") || (profile).equalsIgnoreCase("prod")) {
             log.info("Профиль: {}, параметры не загружаем", profile);
+            return;
         }
         
         log.info("Загрузка .env для профиля: {}", profile);
