@@ -1,6 +1,6 @@
 services:
   # ──────────────────────────────────────────────────────────
-  # База данных
+  # База данных ланчей
   # ──────────────────────────────────────────────────────────
   lunch_db:
     image: mysql:8.0-oraclelinux8
@@ -11,8 +11,8 @@ services:
     environment:
       - MYSQL_DATABASE=lunch_service
       - MYSQL_USER=lunch_user
-      - MYSQL_PASSWORD=Lan2sV1nv1
-      - MYSQL_ROOT_PASSWORD=Lan2sV1nv1
+      - MYSQL_PASSWORD
+      - MYSQL_ROOT_PASSWORD
       - MYSQL_ROOT_HOST=%
       - TZ=Europe/Moscow
     command:
@@ -32,7 +32,7 @@ services:
     networks:
       - cb-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-Lan2sV1nv1"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-password"]
       interval: 30s
       timeout: 10s
       retries: 5
