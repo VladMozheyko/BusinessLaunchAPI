@@ -1,14 +1,18 @@
-name: lunchservice
-
 services:
-  # ==================== MySQL ====================
-  lunchservice_db:
+  # ──────────────────────────────────────────────────────────
+  # База данных
+  # ──────────────────────────────────────────────────────────
+  lunch_db:
     image: mysql:8.0-oraclelinux8
     container_name: cb_lunchservice_db
     restart: unless-stopped
+    ports:
+      - "3306"
     environment:
       - MYSQL_DATABASE=lunch_service
-      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_USER=lunch_user
+      - MYSQL_PASSWORD=Lan2sV1nv1
+      - MYSQL_ROOT_PASSWORD=Lan2sV1nv1
       - MYSQL_ROOT_HOST=%
       - TZ=Europe/Moscow
     command:
@@ -23,42 +27,49 @@ services:
       - --table-open-cache=400
       - --skip-name-resolve
     volumes:
-      - ./data/lunchservice/mysql:/var/lib/mysql
-      - ./logs/lunchservice/mysql:/var/log/mysql
+      - ./data/lunch-service/mysql:/var/lib/mysql
+      - ./logs/lunch-service/mysql:/var/log/mysql
     networks:
       - cb-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpassword"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-Lan2sV1nv1"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
 
-  # ==================== Lunch Service ====================
+  # ──────────────────────────────────────────────────────────
+  # Lunch Service
+  # ──────────────────────────────────────────────────────────
   lunch-service:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: cb_lunchservice_svc
+    image: lunch-service:1.0.0
     restart: unless-stopped
-    env_file:
-      - .env.prod
+    ports:
+      - "8090:8080"
     depends_on:
-      lunchservice_db:
+      lunch_db:
         condition: service_healthy
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - SERVER_PORT=8085
+      - SERVER_PORT=8080
       - SERVER_SSL_ENABLED=false
-      - SPRING_DATASOURCE_URL=jdbc:mysql://lunchservice_db:3306/lunch_service?serverTimezone=Europe/Moscow&useSSL=false&allowPublicKeyRetrieval=true
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=rootpassword
+      - DB_HOST=lunch_db
+      - DB_PORT=3306
+      - DB_NAME=lunch_service
+      - DB_USERNAME
+      - DB_PASSWORD
+      - NOTIFICATION_SERVICE_URL=http://notification:8082
+      - FOOD_SERVICE_URL=http://food-service:8086
       - TZ=Europe/Moscow
     mem_limit: 1g
     networks:
       - cb-network
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8085/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/actuator/health || exit 1"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -68,10 +79,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
-volumes:
-  lunchservice_mysql_data:
-    driver: local
 
 networks:
   cb-network:
